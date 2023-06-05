@@ -1,2 +1,2 @@
 [workspace]
-members = ["blackjack_lib"]
+members = ["blackjack_lib", "blackjack_sim"]
