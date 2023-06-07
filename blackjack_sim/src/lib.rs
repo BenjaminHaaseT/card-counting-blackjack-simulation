@@ -1,4 +1,4 @@
-pub mod table;
+pub mod sim;
 
 use blackjack_lib::{BlackjackTable, Card, Deck};
 
