@@ -1,13 +1,13 @@
 use crate::sim::game::strategy::CountingStrategy;
 use crate::sim::game::table::TableState;
-use blackjack_lib::{Card, Player};
+use blackjack_lib::{BlackjackGameError, Card, Player};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-struct PlayerSim<S: CountingStrategy> {
+pub struct PlayerSim<S: CountingStrategy> {
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
-    bets: Vec<u32>,
+    pub bets: Vec<u32>,
     hand_idx: usize,
     balance: f64,
     strategy: S,
@@ -27,19 +27,24 @@ impl<S: CountingStrategy> PlayerSim<S> {
     }
 
     /// Function to simluate the placing of a bet, updates the `PlayerSim`'s balance and bets
-    pub fn place_bet(&mut self) {
+    /// TODO: Create specific out of funds error to end the game early, do so in the main library
+    pub fn place_bet(&mut self) -> Result<(), BlackjackGameError> {
+        if self.balance == 0.0 {
+            return Err(BlackjackGameError::new(String::from("out of funds")));
+        }
         let bet = u32::min(self.strategy.bet(), self.balance as u32);
         self.balance -= bet as f64;
         self.bets.push(bet);
+        Ok(())
     }
 
-    /// Method to receive a card
+    /// Method to receive a card, updates the state of the `Player`
     pub fn receive_card(&mut self, card: Rc<Card>) {
         // Push new card onto current hand
         self.hand[self.hand_idx].push(Rc::clone(&card));
 
         // Update the value of the current hand
-        let card_val = card.get_card_value();
+        let card_val = card.val;
         if self.hand_values[self.hand_idx].is_empty() {
             self.hand_values[self.hand_idx].push(card_val);
         } else {
@@ -61,7 +66,7 @@ impl<S: CountingStrategy> PlayerSim<S> {
 
     /// Public method for producing the possible options a player can choose to player their current hand
     pub fn get_playing_options(&self) -> HashMap<i32, String> {
-        let options = HashMap::new();
+        let mut options = HashMap::new();
         options.insert(1i32, "stand".to_string());
         options.insert(2, "hit".to_string());
         let mut option_count = 3;
@@ -76,5 +81,39 @@ impl<S: CountingStrategy> PlayerSim<S> {
         options
     }
 
-    //TODO: implement can_split(), can_double_down(), etc...
+    fn can_split(&self) -> bool {
+        self.hand.len() < 4 && self.hand[self.hand_idx][0].rank == self.hand[self.hand_idx][1].rank
+    }
+
+    fn can_double_down(&self) -> bool {
+        self.hand_idx == 0
+            && if self.hand_values[self.hand_idx].len() == 2 {
+                self.hand_values[self.hand_idx][0] == 9
+                    || self.hand_values[self.hand_idx][0] == 9
+                    || self.hand_values[self.hand_idx][1] == 10
+                    || self.hand_values[self.hand_idx][0] == 11
+                    || self.hand_values[self.hand_idx][1] == 11
+            } else {
+                self.hand_values[self.hand_idx][0] == 9
+                    || self.hand_values[self.hand_idx][1] == 9
+                    || self.hand_values[self.hand_idx][0] == 10
+                    || self.hand_values[self.hand_idx][1] == 10
+                    || self.hand_values[self.hand_idx][0] == 11
+                    || self.hand_values[self.hand_idx][1] == 11
+            }
+    }
+
+    pub fn has_blackjack(&self) -> bool {
+        self.hand_idx == 0
+            && self.hand[self.hand_idx].len() == 2
+            && ((self.hand[self.hand_idx][0].val == 10 && self.hand[self.hand_idx][1].rank == "A")
+                || (self.hand[self.hand_idx][0].rank == "A"
+                    && self.hand[self.hand_idx][1].val == 10))
+    }
+
+    pub fn update_strategy(&mut self, card: Rc<Card>) {
+        self.strategy.update(card);
+    }
 }
+
+impl<S: CountingStrategy> Player for PlayerSim<S> {}

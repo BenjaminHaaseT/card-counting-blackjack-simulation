@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub trait CountingStrategy {
-    fn update(&mut self, cards: &Vec<Rc<Card>>);
+    fn update(&mut self, cards: Rc<Card>);
     fn bet(&self) -> u32;
     fn decide_option<'a>(
         &self,
