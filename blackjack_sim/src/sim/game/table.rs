@@ -24,11 +24,40 @@ impl DealersHandSim {
             hand_value: Vec::new(),
         }
     }
+
+    /// Method for receiving a card, changes the state of the `DealersHandSim` instance
+    pub fn receive_card(&mut self, card: Rc<Card>) {
+        let card_val = card.val;
+        self.hand.push(card);
+        if self.hand_value.is_empty() {
+            self.hand_value.push(card_val);
+        } else {
+            self.hand_value[0] += card_val;
+            if self.hand_value.len() == 2 {
+                self.hand_value[1] += card_val;
+            }
+        }
+
+        // Check if we need to add an alternative hand value
+        if self.hand.len() == 1 && self.hand_value[0] <= 11 && card_val == 1 {
+            let alternative_hand_val = self.hand_value[0] + 10;
+            self.hand_value.push(alternative_hand_val);
+        }
+    }
+
+    /// Methods that checks if the dealer has a blackjack
+    pub fn has_blackjack(&self) -> bool {
+        self.hand.len() == 2
+            && ((self.hand[0].val == 10 && self.hand[1].rank == "A")
+                || (self.hand[0].rank == "A" && self.hand[1].val == 10))
+    }
 }
 
 /// Struct for a simulated blackjack game
 pub struct BlackjackTableSim {
     pub balance: f32,
+    pub hand_data: Vec<(i32, String, String)>,
+    bet_data: Vec<i32>,
     dealers_hand: DealersHandSim,
     n_decks: usize,
     n_shuffles: u32,
@@ -42,6 +71,8 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         let deck = Deck::new(n_decks);
         BlackjackTableSim {
             balance: starting_balance,
+            hand_data: vec![],
+            bet_data: vec![],
             dealers_hand,
             n_decks,
             n_shuffles,
@@ -70,8 +101,32 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
 
         // This card is face down so the players strategy should not take this card into account
         cur_card = self.deck.get_next_card().unwrap();
-        self.dealers_hand.receive_card(cur_card)
+        self.dealers_hand.receive_card(cur_card);
 
-        // TODO: implement updating the values of dealers/players hands, check for blackjack etc...
+        // Check if dealer has blackjack, if so check if player has blackjack
+        //  in either case the hand needs to end. Log the bet, and the hand values of dealer, player respectively
+        // We need to update self.hand_data for logging purposes
+        // TODO: implement .formatted_hand_values() for dealers_hand and reset methods as well
+        if self.dealers_hand.has_blackjack() {
+            let (amount, players_formatted_hand, dealers_formatted_hand) = if player.has_blackjack()
+            {
+                (
+                    player.push(),
+                    player.formatted_hand_values(),
+                    self.dealers_hand.formatted_hand_values(),
+                )
+            } else {
+                (
+                    player.lose(),
+                    player.formatted_hand_values(),
+                    self.dealers_hand.formatted_hand_values(),
+                )
+            };
+            // Save this for logging purposes
+            self.hand_data
+                .push((amount, players_formatted_hand, dealers_formatted_hand));
+            player.reset();
+            self.dealers_hand.reset();
+        }
     }
 }

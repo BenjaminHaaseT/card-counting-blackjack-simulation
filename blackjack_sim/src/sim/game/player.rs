@@ -64,6 +64,25 @@ impl<S: CountingStrategy> PlayerSim<S> {
         }
     }
 
+    /// Method to return a formatted version of all the players hand(s)
+    pub fn formatted_hand_values(&self) -> String {
+        self.hand_values
+            .iter()
+            .map(|hand| {
+                if hand.len() == 2 {
+                    if hand[0] <= 21 && hand[1] <= 21 {
+                        format!("{}/{}", hand[0], hand[1])
+                    } else {
+                        format!("{}", u8::min(hand[0], hand[1]))
+                    }
+                } else {
+                    format!("{}", hand[0])
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(", ")
+    }
+
     /// Public method for producing the possible options a player can choose to player their current hand
     pub fn get_playing_options(&self) -> HashMap<i32, String> {
         let mut options = HashMap::new();
@@ -81,10 +100,12 @@ impl<S: CountingStrategy> PlayerSim<S> {
         options
     }
 
+    /// Returns a boolean, true if the `PlayerSim` instance can split their hand, false otherwise.
     fn can_split(&self) -> bool {
         self.hand.len() < 4 && self.hand[self.hand_idx][0].rank == self.hand[self.hand_idx][1].rank
     }
 
+    /// Returns a boolean, true if the `PlayerSim` can double down, false otherwise.
     fn can_double_down(&self) -> bool {
         self.hand_idx == 0
             && if self.hand_values[self.hand_idx].len() == 2 {
@@ -103,6 +124,7 @@ impl<S: CountingStrategy> PlayerSim<S> {
             }
     }
 
+    /// Returns a boolean representing whether the player has a blackjack or not.
     pub fn has_blackjack(&self) -> bool {
         self.hand_idx == 0
             && self.hand[self.hand_idx].len() == 2
@@ -111,8 +133,34 @@ impl<S: CountingStrategy> PlayerSim<S> {
                     && self.hand[self.hand_idx][1].val == 10))
     }
 
+    /// Method that acts as a wrapper for accessing the `PlayerSim` struct instances `strategy`.
     pub fn update_strategy(&mut self, card: Rc<Card>) {
         self.strategy.update(card);
+    }
+
+    /// Method to stand on a current hand, increases the value of `self.hand_idx` to represent
+    /// that the current hand at position `self.hand_idx` is now over.
+    pub fn stand(&mut self) {
+        self.hand_idx += 1;
+    }
+
+    /// Method to update the state of the players hand when a push occurs.
+    /// Change the bet of the current hand to 0, update the balance and return 0.
+    pub fn push(&mut self) -> i32 {
+        let bet = self.bets[self.hand_idx];
+        self.balance += bet as f64;
+        self.bets[self.hand_idx] = 0;
+        self.stand();
+        0
+    }
+
+    /// Method to update the state of the players hand when a bet is lost.
+    /// Change the bet of the current hand to 0, and return the value negative value of the bet to indicate a loss occured
+    pub fn lose(&mut self) -> i32 {
+        let bet = -(self.bets[self.hand_idx] as i32);
+        self.bets[self.hand_idx] = 0;
+        self.stand();
+        bet
     }
 }
 
