@@ -9,13 +9,13 @@ pub struct PlayerSim<S: CountingStrategy> {
     hand_values: Vec<Vec<u8>>,
     pub bets: Vec<u32>,
     hand_idx: usize,
-    balance: f64,
+    balance: f32,
     strategy: S,
 }
 
 impl<S: CountingStrategy> PlayerSim<S> {
     /// Associated function to create a new `PlayerSim` struct.
-    pub fn new(starting_balance: f64, strategy: S) -> PlayerSim<S> {
+    pub fn new(starting_balance: f32, strategy: S) -> PlayerSim<S> {
         PlayerSim {
             hand: vec![vec![]],
             hand_values: vec![vec![]],
@@ -26,15 +26,21 @@ impl<S: CountingStrategy> PlayerSim<S> {
         }
     }
 
+    /// Method to generate bet from the counting strategy
+    pub fn get_bet(&mut self) -> u32 {
+        let bet = u32::min(self.strategy.bet(), self.balance as u32);
+        self.balance -= bet as f32;
+        bet
+    }
+
     /// Function to simluate the placing of a bet, updates the `PlayerSim`'s balance and bets
-    /// TODO: Create specific out of funds error to end the game early, do so in the main library
-    pub fn place_bet(&mut self) -> Result<(), BlackjackGameError> {
+    pub fn place_bet(&mut self, bet: f32) -> Result<(), BlackjackGameError> {
         if self.balance == 0.0 {
             return Err(BlackjackGameError::new(String::from("out of funds")));
         }
-        let bet = u32::min(self.strategy.bet(), self.balance as u32);
-        self.balance -= bet as f64;
-        self.bets.push(bet);
+        // let bet = u32::min(self.strategy.bet(), self.balance as u32);
+        // self.balance -= bet as f64;
+        self.bets.push(bet as u32);
         Ok(())
     }
 
@@ -148,7 +154,7 @@ impl<S: CountingStrategy> PlayerSim<S> {
     /// Change the bet of the current hand to 0, update the balance and return 0.
     pub fn push(&mut self) -> i32 {
         let bet = self.bets[self.hand_idx];
-        self.balance += bet as f64;
+        self.balance += bet as f32;
         self.bets[self.hand_idx] = 0;
         self.stand();
         0
@@ -161,6 +167,23 @@ impl<S: CountingStrategy> PlayerSim<S> {
         self.bets[self.hand_idx] = 0;
         self.stand();
         bet
+    }
+
+    /// Method that returns a boolean, true if the player has busted on their current hand false if the current hand has not busted.
+    /// Will panic if `self.hand_idx` > `self.hand.len()`
+    pub fn busted(&self) -> bool {
+        if self.hand_values[self.hand_idx].len() == 2 {
+            self.hand_values[self.hand_idx][0] > 21 && self.hand_values[self.hand_idx][1] > 21
+        } else {
+            self.hand_values[self.hand_idx][0] > 21
+        }
+    }
+
+    /// Method that implements the logic for doubling down. Will panic if there is not `self.balance` is not high enough
+    pub fn double_down(&mut self) {
+        assert!(self.bets[self.hand_idx] as f32 <= self.balance);
+        self.balance -= self.bets[self.hand_idx] as f32;
+        self.bets[self.hand_idx] *= 2;
     }
 }
 

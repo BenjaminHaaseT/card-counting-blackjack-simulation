@@ -1,6 +1,6 @@
 use crate::sim::game::player::PlayerSim;
 use crate::sim::game::strategy::CountingStrategy;
-use blackjack_lib::{BlackjackTable, Card, Deck};
+use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
 use std::rc::Rc;
 
 // use super::strategy::CountingStrategy;
@@ -45,6 +45,19 @@ impl DealersHandSim {
         }
     }
 
+    /// Method for getting the formatted hand value of the dealer, intended for logging purposes
+    pub fn formatted_hand_values(&self) -> String {
+        if self.hand_value.len() == 2 {
+            if self.hand_value[0] <= 21 && self.hand_value[1] <= 21 {
+                format!("{}/{}", self.hand_value[0], self.hand_value[1])
+            } else {
+                format!("{}", u8::min(self.hand_value[0], self.hand_value[1]))
+            }
+        } else {
+            format!("{}", self.hand_value[0])
+        }
+    }
+
     /// Methods that checks if the dealer has a blackjack
     pub fn has_blackjack(&self) -> bool {
         self.hand.len() == 2
@@ -78,6 +91,24 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             n_shuffles,
             deck,
         }
+    }
+    /// Takes a player and a bet and handles the logic for placing a bet before a hand is dealt
+    fn place_bet(
+        &self,
+        player: &mut PlayerSim<S>,
+        bet: f32,
+    ) -> Result<(), blackjack_lib::BlackjackGameError> {
+        if bet <= 0.0 {
+            return Err(BlackjackGameError {
+                message: "bet must be a positive amount".to_string(),
+            });
+            // return Err("Bet must be a positive amount".to_string());
+        } else if self.balance < 1.5 * bet {
+            return Err(BlackjackGameError {
+                message: "insufficient table balance to payout bet".to_string(),
+            });
+        }
+        player.place_bet(bet)
     }
 
     /// Simulates dealing a hand of blackjack, the method may panic if `player` has not placed a valid bet.
@@ -125,8 +156,47 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             // Save this for logging purposes
             self.hand_data
                 .push((amount, players_formatted_hand, dealers_formatted_hand));
-            player.reset();
-            self.dealers_hand.reset();
         }
     }
+
+    /// Deals a card to the player, allows the player to update their strategy.
+    /// If the player busted, then data about the hand is saved for logging purposes.
+    fn hit(&mut self, player: &mut PlayerSim<S>) {
+        // Deal another card to the player and make sure the player updates their strategy
+        let card = self.deck.get_next_card().unwrap();
+        player.receive_card(Rc::clone(&card));
+        player.update_strategy(card);
+        if player.busted() {
+            // Log the hand data
+            self.hand_data.push((
+                player.lose(),
+                player.formatted_hand_values(),
+                String::from("NA"),
+            ));
+        }
+    }
+
+    /// Method for implementing the logic needed to double down on a bet
+    fn double_down(&mut self, player: &mut PlayerSim<S>) {
+        player.double_down();
+        // Deal the player another card
+        let card = self.deck.get_next_card().unwrap();
+        player.receive_card(Rc::clone(&card));
+        player.update_strategy(card);
+        // Check if player has busted or not
+        if !player.busted() {
+            player.stand();
+        } else {
+            // The player lost the hand, data needs to be logged
+            self.hand_data.push((
+                player.lose(),
+                player.formatted_hand_values(),
+                String::from("NA"),
+            ));
+        }
+    }
+
+    fn split(&mut self, player: &mut PlayerSim<S>) {}
+
+    fn stand(&self, player: &mut PlayerSim<S>) {}
 }
