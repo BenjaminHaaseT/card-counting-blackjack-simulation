@@ -1,6 +1,7 @@
 use crate::sim::game::player::PlayerSim;
 use crate::sim::game::strategy::CountingStrategy;
 use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // use super::strategy::CountingStrategy;
@@ -39,7 +40,7 @@ impl DealersHandSim {
         }
 
         // Check if we need to add an alternative hand value
-        if self.hand.len() == 1 && self.hand_value[0] <= 11 && card_val == 1 {
+        if self.hand_value.len() == 1 && self.hand_value[0] <= 11 && card_val == 1 {
             let alternative_hand_val = self.hand_value[0] + 10;
             self.hand_value.push(alternative_hand_val);
         }
@@ -92,6 +93,7 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             deck,
         }
     }
+
     /// Takes a player and a bet and handles the logic for placing a bet before a hand is dealt
     fn place_bet(
         &self,
@@ -137,7 +139,6 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         // Check if dealer has blackjack, if so check if player has blackjack
         //  in either case the hand needs to end. Log the bet, and the hand values of dealer, player respectively
         // We need to update self.hand_data for logging purposes
-        // TODO: implement .formatted_hand_values() for dealers_hand and reset methods as well
         if self.dealers_hand.has_blackjack() {
             let (amount, players_formatted_hand, dealers_formatted_hand) = if player.has_blackjack()
             {
@@ -196,7 +197,73 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         }
     }
 
-    fn split(&mut self, player: &mut PlayerSim<S>) {}
+    /// Method that implements the logic for splitting
+    fn split(&mut self, player: &mut PlayerSim<S>) {
+        let (card1, card2) = (
+            self.deck.get_next_card().unwrap(),
+            self.deck.get_next_card().unwrap(),
+        );
+        player.split(Rc::clone(&card1), Rc::clone(&card2));
+        player.update_strategy(card1);
+        player.update_strategy(card2);
+    }
 
-    fn stand(&self, player: &mut PlayerSim<S>) {}
+    /// Method that calls the `player`'s stand method.
+    fn stand(&self, player: &mut PlayerSim<S>) {
+        player.stand();
+    }
+
+    /// Takes a `PlayerSim<S>` struct, a HashMap<i32, String> representing the options available during the current turn (these options will be decided during runtime), and an i32 `option`.
+    /// The method decides what method to call the implements the appropriate logic, returns a `Result<(), BlackjackGameError>` since the method is fallible.
+    fn play_option(
+        &mut self,
+        player: &mut PlayerSim<S>,
+        options: &std::collections::HashMap<i32, String>,
+        option: i32,
+    ) -> Result<(), BlackjackGameError> {
+        match options.get(&option) {
+            Some(s) if s == "stand" => Ok(self.stand(player)),
+            Some(s) if s == "hit" => Ok(self.hit(player)),
+            Some(s) if s == "split" => Ok(self.split(player)),
+            Some(s) if s == "double down" => Ok(self.double_down(player)),
+            _ => Err(BlackjackGameError::new("option not available".to_string())),
+        }
+    }
+
+    /// Method that computes and returns the optimal final hand for the dealer at the end of a hand of blackjack
+    fn get_dealers_optimal_final_hand(&mut self) -> u8 {
+        if self.dealers_hand.hand_value.len() == 2 {
+            while self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] < 17 {
+                self.dealers_hand
+                    .receive_card(self.deck.get_next_card().unwrap());
+            }
+
+            // Ensure we have a valid hand according to the rules of blackjack
+            while (self.dealers_hand.hand_value[0] > 21 && self.dealers_hand.hand_value[1] < 17)
+                || (self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] > 21)
+            {
+                self.dealers_hand
+                    .receive_card(self.deck.get_next_card().unwrap());
+            }
+
+            if self.dealers_hand.hand_value[0] <= 21 && self.dealers_hand.hand_value[1] <= 21 {
+                return u8::max(
+                    self.dealers_hand.hand_value[0],
+                    self.dealers_hand.hand_value[1],
+                );
+            } else {
+                return u8::min(
+                    self.dealers_hand.hand_value[0],
+                    self.dealers_hand.hand_value[1],
+                );
+            }
+        }
+
+        while self.dealers_hand.hand_value[0] < 17 {
+            self.dealers_hand
+                .receive_card(self.deck.get_next_card().unwrap());
+        }
+
+        self.dealers_hand.hand_value[0]
+    }
 }

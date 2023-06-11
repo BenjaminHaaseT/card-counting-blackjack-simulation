@@ -179,11 +179,47 @@ impl<S: CountingStrategy> PlayerSim<S> {
         }
     }
 
-    /// Method that implements the logic for doubling down. Will panic if there is not `self.balance` is not high enough
+    /// Method that implements the logic for doubling down. Will panic if `self.balance` is not high enough to place the bet.
     pub fn double_down(&mut self) {
         assert!(self.bets[self.hand_idx] as f32 <= self.balance);
         self.balance -= self.bets[self.hand_idx] as f32;
         self.bets[self.hand_idx] *= 2;
+    }
+
+    /// Method that implements the logic for splitting.
+    /// Will panic if `self.balance` is not high enough to place the bet or if the current hand is empty().
+    pub fn split(&mut self, card1: Rc<Card>, card2: Rc<Card>) {
+        assert!(self.bets[self.hand_idx] as f32 <= self.balance);
+        // Get current bet and duplicate it for the new hand
+        let cur_bet = self.bets[self.hand_idx];
+        self.bets.insert(self.hand_idx + 1, cur_bet);
+
+        // Split the current hand, and start with empty hand values
+        let new_hand_start = self.hand[self.hand_idx].pop().unwrap();
+        self.hand.insert(self.hand_idx + 1, vec![new_hand_start]);
+        self.hand_values[self.hand_idx].clear();
+        self.hand_values.insert(self.hand_idx + 1, vec![]);
+
+        // receive a new card for each hand
+        self.hand[self.hand_idx].push(card1);
+        self.hand[self.hand_idx + 1].push(card2);
+
+        // Now recompute the hand values
+        let hand1: u8 = self.hand[self.hand_idx].iter().map(|c| c.val).sum();
+        self.hand_values[self.hand_idx].push(hand1);
+        if hand1 <= 11
+            && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1].rank == "A")
+        {
+            self.hand_values[self.hand_idx].push(hand1 + 10);
+        }
+
+        let hand2: u8 = self.hand[self.hand_idx + 1].iter().map(|c| c.val).sum();
+        self.hand_values[self.hand_idx].push(hand2);
+        if hand2 <= 11
+            && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1] == "A")
+        {
+            self.hand_values[self.hand_idx].push(hand2 + 10);
+        }
     }
 }
 
