@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub struct PlayerSim<S: CountingStrategy> {
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
-    pub bets: Vec<u32>,
+    pub bets: Vec<i32>,
     hand_idx: usize,
     balance: f32,
     strategy: S,
@@ -40,7 +40,7 @@ impl<S: CountingStrategy> PlayerSim<S> {
         }
         // let bet = u32::min(self.strategy.bet(), self.balance as u32);
         // self.balance -= bet as f64;
-        self.bets.push(bet as u32);
+        self.bets.push(bet as i32);
         Ok(())
     }
 
@@ -140,8 +140,10 @@ impl<S: CountingStrategy> PlayerSim<S> {
     }
 
     /// Method that acts as a wrapper for accessing the `PlayerSim` struct instances `strategy`.
-    pub fn update_strategy(&mut self, card: Rc<Card>) {
-        self.strategy.update(card);
+    pub fn update_strategy<I: IntoIterator<Item = Rc<Card>>>(&mut self, cards: I) {
+        for card in cards {
+            self.strategy.update(card);
+        }
     }
 
     /// Method to stand on a current hand, increases the value of `self.hand_idx` to represent
@@ -152,21 +154,23 @@ impl<S: CountingStrategy> PlayerSim<S> {
 
     /// Method to update the state of the players hand when a push occurs.
     /// Change the bet of the current hand to 0, update the balance and return 0.
-    pub fn push(&mut self) -> i32 {
+    pub fn push(&mut self) -> (usize, i32) {
         let bet = self.bets[self.hand_idx];
         self.balance += bet as f32;
         self.bets[self.hand_idx] = 0;
+        let cur_hand_idx = self.hand_idx;
         self.stand();
-        0
+        (cur_hand_idx, 0)
     }
 
     /// Method to update the state of the players hand when a bet is lost.
     /// Change the bet of the current hand to 0, and return the value negative value of the bet to indicate a loss occured
-    pub fn lose(&mut self) -> i32 {
+    pub fn lose(&mut self) -> (usize, i32) {
         let bet = -(self.bets[self.hand_idx] as i32);
         self.bets[self.hand_idx] = 0;
+        let cur_hand_idx = self.hand_idx;
         self.stand();
-        bet
+        (cur_hand_idx, bet)
     }
 
     /// Method that returns a boolean, true if the player has busted on their current hand false if the current hand has not busted.
@@ -216,7 +220,7 @@ impl<S: CountingStrategy> PlayerSim<S> {
         let hand2: u8 = self.hand[self.hand_idx + 1].iter().map(|c| c.val).sum();
         self.hand_values[self.hand_idx].push(hand2);
         if hand2 <= 11
-            && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1] == "A")
+            && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1].rank == "A")
         {
             self.hand_values[self.hand_idx].push(hand2 + 10);
         }
