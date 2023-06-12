@@ -73,6 +73,7 @@ pub struct BlackjackTableSim {
     pub hand_data: Vec<(i32, String, String)>,
     final_cards: Vec<Rc<Card>>,
     dealers_hand: DealersHandSim,
+    bet_data: Vec<f32>,
     n_decks: usize,
     n_shuffles: u32,
     deck: Deck,
@@ -87,6 +88,7 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             balance: starting_balance,
             hand_data: vec![],
             final_cards: vec![],
+            bet_data: vec![],
             dealers_hand,
             n_decks,
             n_shuffles,
@@ -121,25 +123,34 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         // Now deal cards to player and dealer
         let mut cur_card = self.deck.get_next_card().unwrap();
         player.receive_card(Rc::clone(&cur_card));
-        player.update_strategy(Some(cur_card));
+        player.update_strategy(Some(&cur_card));
 
         // First card to dealer is face up so the players strategy should be aware of it
         cur_card = self.deck.get_next_card().unwrap();
         self.dealers_hand.receive_card(Rc::clone(&cur_card));
-        player.update_strategy(Some(cur_card));
+        player.update_strategy(Some(&cur_card));
 
         cur_card = self.deck.get_next_card().unwrap();
         player.receive_card(Rc::clone(&cur_card));
-        player.update_strategy(Some(cur_card));
+        player.update_strategy(Some(&cur_card));
 
         // This card is face down so the players strategy should not take this card into account
         cur_card = self.deck.get_next_card().unwrap();
         self.dealers_hand.receive_card(cur_card);
 
-        // Check if either the dealer or player has blackjack if so the hand needs to end, so call player.stand()
-        // TODO: Need to fix this for the simulation, hand needs to end
-        if self.dealers_hand.has_blackjack() || player.has_blackjack() {
-            
+        // We need to implement the correct logic whether or not a blackjack as occured, log the betting data as well
+        // TODO: Start by implementing the correct needed for the book keeping i.e. keeping track of the bets that have been won/lost
+        // Need for logging purposes
+        if self.dealers_hand.has_blackjack() {
+            if player.has_blackjack() {
+                player.push();
+            } else {
+                player.lose();
+            }
+        } else if player.has_blackjack() {
+            let current_bet = player.get_current_bet() as f32;
+            self.balance -= current_bet;
+            player.blackjack(current_bet * 1.5);
         }
     }
 
@@ -149,9 +160,9 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         // Deal another card to the player and make sure the player updates their strategy
         let card = self.deck.get_next_card().unwrap();
         player.receive_card(Rc::clone(&card));
-        player.update_strategy(Some(card));
+        player.update_strategy(Some(&card));
         if player.busted() {
-            player.stand();
+            player.lose();
         }
     }
 
@@ -161,7 +172,7 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         // Deal the player another card
         let card = self.deck.get_next_card().unwrap();
         player.receive_card(Rc::clone(&card));
-        player.update_strategy(Some(card));
+        player.update_strategy(Some(&card));
         player.stand();
     }
 
@@ -172,8 +183,8 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             self.deck.get_next_card().unwrap(),
         );
         player.split(Rc::clone(&card1), Rc::clone(&card2));
-        player.update_strategy(Some(card1));
-        player.update_strategy(Some(card2));
+        player.update_strategy(Some(&card1));
+        player.update_strategy(Some(&card2));
     }
 
     /// Method that calls the `player`'s stand method.
@@ -242,13 +253,5 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
     }
 
     //TODO: Need to find a way of recording what bets were won/lost in an efficient way
-    fn finish_hand(&mut self, player: &mut PlayerSim<S>) {
-        let dealers_final_hand_value: Option<u8> = None;
-        for (hand: u8, bet: u32) in player.final_hands() {
-            if 
-        }
-
-        self.dealers_hand.reset();
-        player.reset();
-    }
+    fn finish_hand(&mut self, player: &mut PlayerSim<S>) {}
 }
