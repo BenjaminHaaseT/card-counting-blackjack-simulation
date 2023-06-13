@@ -1,6 +1,6 @@
 use crate::sim::game::strategy::CountingStrategy;
 use crate::sim::game::table::TableState;
-use blackjack_lib::{BlackjackGameError, Card, Player};
+use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -8,7 +8,7 @@ pub struct PlayerSim<S: CountingStrategy> {
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
     pub bets: Vec<u32>,
-    winnings: Vec<f32>,
+    pub bets_log: HashMap<usize, f32>,
     hand_idx: usize,
     balance: f32,
     strategy: S,
@@ -21,18 +21,11 @@ impl<S: CountingStrategy> PlayerSim<S> {
             hand: vec![vec![]],
             hand_values: vec![vec![]],
             bets: vec![],
-            winnings: vec![],
+            bets_log: HashMap::new(),
             hand_idx: 0,
             balance: starting_balance,
             strategy,
         }
-    }
-
-    /// Method to generate bet from the counting strategy
-    pub fn get_bet(&mut self) -> u32 {
-        let bet = u32::min(self.strategy.bet(), self.balance as u32);
-        self.balance -= bet as f32;
-        bet
     }
 
     /// Getter method for the players current bet
@@ -42,12 +35,12 @@ impl<S: CountingStrategy> PlayerSim<S> {
 
     /// Function to simluate the placing of a bet, updates the `PlayerSim`'s balance and bets
     pub fn place_bet(&mut self, bet: f32) -> Result<(), BlackjackGameError> {
-        if self.balance == 0.0 {
-            return Err(BlackjackGameError::new(String::from("out of funds")));
+        let bet = self.strategy.bet(self.balance);
+        if bet == 0 {
+            return Err(BlackjackGameError::new("out of funds.".to_string()));
         }
-        // let bet = u32::min(self.strategy.bet(), self.balance as u32);
-        // self.balance -= bet as f64;
-        self.bets.push(bet as u32);
+        self.balance -= bet as f32;
+        self.bets.push(bet);
         Ok(())
     }
 
@@ -161,22 +154,52 @@ impl<S: CountingStrategy> PlayerSim<S> {
 
     /// Method to update the state of the players hand when a push occurs.
     /// Change the bet of the current hand to 0, update the balance and return 0.
-    pub fn push(&mut self) -> i32 {
+    pub fn push_current_hand(&mut self) {
         let bet = self.bets[self.hand_idx];
         self.balance += bet as f32;
         self.bets[self.hand_idx] = 0;
+        self.bets_log.insert(self.hand_idx, 0.0);
         self.stand();
-        0
     }
 
     /// Method to update the state of the players hand when a bet is lost.
     /// Change the bet of the current hand to 0, and return the value negative value of the bet to indicate a loss occured
-    pub fn lose(&mut self) -> i32 {
+    pub fn lose_current_hand(&mut self) {
         let bet = -(self.bets[self.hand_idx] as i32);
         self.bets[self.hand_idx] = 0;
-        let cur_hand_idx = self.hand_idx;
+        self.bets_log.insert(self.hand_idx, bet as f32);
         self.stand();
-        bet
+    }
+
+    /// Method for updating the internal bookeeping of won/lost bets when the player gets a blackjack
+    pub fn blackjack(&mut self, winnings: f32) {
+        let bet = self.bets[self.hand_idx] as f32;
+        self.balance += bet;
+        self.bets[self.hand_idx] = 0;
+        self.bets_log.insert(self.hand_idx, winnings);
+        self.stand();
+    }
+
+    /// Method to update the `PlayerSim` structs bets_log
+    pub fn win_hand(&mut self, hand: usize, bet: u32) {
+        self.balance += bet as f32;
+        self.bets_log.insert(hand, bet as f32);
+    }
+
+    /// Method to update the `PlayerSim` structs bets_log
+    pub fn lose_hand(&mut self, hand: usize, bet: u32) {
+        self.bets_log.insert(hand, -(bet as f32));
+    }
+
+    /// Method to update the `PlayerSim` structs bets_log
+    pub fn push_hand(&mut self, hand: usize, bet: u32) {
+        self.balance += bet as f32;
+        self.bets_log.insert(hand, 0.0);
+    }
+
+    /// Method for receiving winnings
+    pub fn collect_winnings(&mut self, winnings: f32) {
+        self.balance += winnings;
     }
 
     /// Method that returns a boolean, true if the player has busted on their current hand false if the current hand has not busted.
@@ -229,6 +252,22 @@ impl<S: CountingStrategy> PlayerSim<S> {
             && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1].rank == "A")
         {
             self.hand_values[self.hand_idx].push(hand2 + 10);
+        }
+    }
+
+    pub fn get_optimal_hands(&mut self) -> Option<Vec<(usize, u32, u8)>> {
+        let res = self
+            .bets
+            .iter()
+            .zip(self.hand_values.iter())
+            .enumerate()
+            .filter(|(i, (bet, hand))| **bet > 0)
+            .map(|(i, (bet, hand))| (i, *bet, compute_optimal_hand(hand)))
+            .collect::<Vec<(usize, u32, u8)>>();
+        if !res.is_empty() {
+            Some(res)
+        } else {
+            None
         }
     }
 }

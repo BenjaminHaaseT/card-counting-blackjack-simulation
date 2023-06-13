@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 pub trait CountingStrategy {
     fn update(&mut self, cards: Rc<Card>);
-    fn bet(&self) -> u32;
+    fn bet(&self, balance: f32) -> u32;
     fn decide_option<'a>(
         &self,
         decision_state: &'a TableState,

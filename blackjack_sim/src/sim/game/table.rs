@@ -143,13 +143,13 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         // Need for logging purposes
         if self.dealers_hand.has_blackjack() {
             if player.has_blackjack() {
-                player.push();
+                player.push_current_hand();
             } else {
-                player.lose();
+                player.lose_current_hand();
             }
         } else if player.has_blackjack() {
             let current_bet = player.get_current_bet() as f32;
-            self.balance -= current_bet;
+            self.balance -= current_bet * 1.5;
             player.blackjack(current_bet * 1.5);
         }
     }
@@ -162,7 +162,7 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         player.receive_card(Rc::clone(&card));
         player.update_strategy(Some(&card));
         if player.busted() {
-            player.lose();
+            player.lose_current_hand();
         }
     }
 
@@ -253,5 +253,45 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
     }
 
     //TODO: Need to find a way of recording what bets were won/lost in an efficient way
-    fn finish_hand(&mut self, player: &mut PlayerSim<S>) {}
+    fn finish_hand(&mut self, player: &mut PlayerSim<S>) {
+        if let Some(players_final_hands) = player.get_optimal_hands() {
+            let dealers_optimal_hand =
+                <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::get_dealers_optimal_final_hand(
+                    self,
+                );
+            for (i, bet, hand) in players_final_hands {
+                if dealers_optimal_hand > 21 || hand > dealers_optimal_hand {
+                    self.balance -= bet as f32;
+                    player.win_hand(i, bet);
+                } else if dealers_optimal_hand == hand {
+                    player.push_hand(i, bet);
+                } else {
+                    player.lose_hand(i, bet);
+                }
+            }
+        }
+
+        let (mut hands_won, mut hands_pushed, mut hands_lost, mut winnings) = (0, 0, 0, 0.0);
+        for (_, bet) in player.bets_log.iter() {
+            if *bet > 0.0 || *bet < 0.0 {
+                winnings += *bet;
+                if *bet < 0.0 {
+                    hands_lost += 1;
+                    self.balance += -1.0 * *bet;
+                } else {
+                    hands_won += 1;
+                }
+            } else {
+                hands_pushed += 1;
+            }
+        }
+        if winnings > 0.0 {
+            player.collect_winnings(winnings);
+        }
+
+        // TODO: implement this logic here
+        // self.log(hands_won, hands_pushed, hands_lost, winnings);
+        // todo!(player.reset());
+        // todo!(self.reset());
+    }
 }
