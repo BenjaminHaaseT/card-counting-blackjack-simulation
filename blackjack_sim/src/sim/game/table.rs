@@ -65,18 +65,31 @@ impl DealersHandSim {
             && ((self.hand[0].val == 10 && self.hand[1].rank == "A")
                 || (self.hand[0].rank == "A" && self.hand[1].val == 10))
     }
+
+    /// Method to reset the hand after a complete hand
+    pub fn reset(&mut self) {
+        self.hand.clear();
+        self.hand_value.clear();
+    }
 }
 
 /// Struct for a simulated blackjack game
 pub struct BlackjackTableSim {
     pub balance: f32,
-    pub hand_data: Vec<(i32, String, String)>,
+    pub hand_log: Option<(i32, i32, i32, f32)>,
     final_cards: Vec<Rc<Card>>,
     dealers_hand: DealersHandSim,
-    bet_data: Vec<f32>,
-    n_decks: usize,
+    // bet_data: Vec<f32>,
+    // n_decks: usize,
     n_shuffles: u32,
     deck: Deck,
+}
+
+impl BlackjackTableSim {
+    fn reset(&mut self) {
+        self.final_cards.clear();
+        self.dealers_hand.reset();
+    }
 }
 
 /// TODO: Implement missing methods on the blackjack table interface
@@ -86,11 +99,9 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         let deck = Deck::new(n_decks);
         BlackjackTableSim {
             balance: starting_balance,
-            hand_data: vec![],
+            hand_log: None,
             final_cards: vec![],
-            bet_data: vec![],
             dealers_hand,
-            n_decks,
             n_shuffles,
             deck,
         }
@@ -106,13 +117,12 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             return Err(BlackjackGameError {
                 message: "bet must be a positive amount".to_string(),
             });
-            // return Err("Bet must be a positive amount".to_string());
         } else if self.balance < 1.5 * bet {
             return Err(BlackjackGameError {
                 message: "insufficient table balance to payout bet".to_string(),
             });
         }
-        player.place_bet(bet)
+        Ok(player.place_bet(bet))
     }
 
     /// Simulates dealing a hand of blackjack, the method may panic if `player` has not placed a valid bet.
@@ -138,10 +148,10 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         cur_card = self.deck.get_next_card().unwrap();
         self.dealers_hand.receive_card(cur_card);
 
-        // We need to implement the correct logic whether or not a blackjack as occured, log the betting data as well
-        // TODO: Start by implementing the correct needed for the book keeping i.e. keeping track of the bets that have been won/lost
-        // Need for logging purposes
+        // Check for a blackjack, if the dealer has a blackjack we need to check whether the player has a blackjack or not as well
+        // in addition we need to update the players strategy, i.e. the counting strategy
         if self.dealers_hand.has_blackjack() {
+            player.update_strategy(Some(&self.dealers_hand.hand[1]));
             if player.has_blackjack() {
                 player.push_current_hand();
             } else {
@@ -277,7 +287,7 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
                 winnings += *bet;
                 if *bet < 0.0 {
                     hands_lost += 1;
-                    self.balance += -1.0 * *bet;
+                    self.balance -= *bet;
                 } else {
                     hands_won += 1;
                 }
@@ -285,13 +295,13 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
                 hands_pushed += 1;
             }
         }
+
         if winnings > 0.0 {
             player.collect_winnings(winnings);
         }
 
-        // TODO: implement this logic here
-        // self.log(hands_won, hands_pushed, hands_lost, winnings);
-        // todo!(player.reset());
-        // todo!(self.reset());
+        self.hand_log = Some((hands_won, hands_pushed, hands_lost, winnings));
+        player.reset();
+        self.reset();
     }
 }

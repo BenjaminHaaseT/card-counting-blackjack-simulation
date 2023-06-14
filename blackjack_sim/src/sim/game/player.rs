@@ -33,15 +33,21 @@ impl<S: CountingStrategy> PlayerSim<S> {
         self.bets[self.hand_idx]
     }
 
-    /// Function to simluate the placing of a bet, updates the `PlayerSim`'s balance and bets
-    pub fn place_bet(&mut self, bet: f32) -> Result<(), BlackjackGameError> {
+    /// Function for getting an initial bet
+    pub fn bet(&mut self) -> Result<u32, BlackjackGameError> {
         let bet = self.strategy.bet(self.balance);
         if bet == 0 {
-            return Err(BlackjackGameError::new("out of funds.".to_string()));
+            return Err(BlackjackGameError::new("out of funds".to_string()));
         }
-        self.balance -= bet as f32;
-        self.bets.push(bet);
-        Ok(())
+
+        Ok(bet)
+    }
+
+    /// Function to simluate the placing of a bet, updates the `PlayerSim`'s balance and bets
+    /// Assumes the logic for checking whether or not the bet is valid has already been executed.
+    pub fn place_bet(&mut self, bet: f32) {
+        self.balance -= bet;
+        self.bets.push(bet as u32);
     }
 
     /// Method to receive a card, updates the state of the `Player`
@@ -269,6 +275,14 @@ impl<S: CountingStrategy> PlayerSim<S> {
         } else {
             None
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.hand = vec![vec![]];
+        self.hand_values = vec![vec![]];
+        self.bets.clear();
+        self.bets_log.clear();
+        self.hand_idx = 0;
     }
 }
 
