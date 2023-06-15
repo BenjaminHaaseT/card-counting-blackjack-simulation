@@ -1,10 +1,10 @@
-use crate::sim::game::strategy::CountingStrategy;
+use crate::sim::game::strategy::Strategy;
 use crate::sim::game::table::TableState;
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct PlayerSim<S: CountingStrategy> {
+pub struct PlayerSim<S: Strategy> {
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
     pub bets: Vec<u32>,
@@ -14,7 +14,7 @@ pub struct PlayerSim<S: CountingStrategy> {
     strategy: S,
 }
 
-impl<S: CountingStrategy> PlayerSim<S> {
+impl<S: Strategy> PlayerSim<S> {
     /// Associated function to create a new `PlayerSim` struct.
     pub fn new(starting_balance: f32, strategy: S) -> PlayerSim<S> {
         PlayerSim {
@@ -286,4 +286,4 @@ impl<S: CountingStrategy> PlayerSim<S> {
     }
 }
 
-impl<S: CountingStrategy> Player for PlayerSim<S> {}
+impl<S: Strategy> Player for PlayerSim<S> {}
