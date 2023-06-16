@@ -1,9 +1,19 @@
 use crate::sim::game::strategy::Strategy;
 use crate::sim::game::table::TableState;
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
+/// Struct that holds the players current state to be used for a decision policy
+pub struct PlayerSimState<'a> {
+    pub hand: &'a Vec<Rc<Card>>,
+    pub hand_value: &'a Vec<u8>,
+    pub bet: u32,
+    pub true_count: i32,
+    pub running_count: i32,
+}
+
+/// Struct for a simulated player
 pub struct PlayerSim<S: Strategy> {
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
@@ -96,17 +106,15 @@ impl<S: Strategy> PlayerSim<S> {
     }
 
     /// Public method for producing the possible options a player can choose to player their current hand
-    pub fn get_playing_options(&self) -> HashMap<i32, String> {
-        let mut options = HashMap::new();
-        options.insert(1i32, "stand".to_string());
-        options.insert(2, "hit".to_string());
-        let mut option_count = 3;
+    pub fn get_playing_options(&self) -> HashSet<String> {
+        let mut options = HashSet::new();
+        options.insert("stand".to_string());
+        options.insert("hit".to_string());
         if self.can_split() {
-            options.insert(option_count, "split".to_string());
-            option_count += 1;
+            options.insert("split".to_string());
         }
         if self.can_double_down() {
-            options.insert(option_count, "double down".to_string());
+            options.insert("double down".to_string());
         }
 
         options

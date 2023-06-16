@@ -1,14 +1,13 @@
-use crate::sim::game::player::PlayerSim;
-use crate::sim::game::strategy::CountingStrategy;
+use crate::sim::game::player::{PlayerSim, PlayerSimState};
+use crate::sim::game::strategy::Strategy;
 use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 // use super::strategy::CountingStrategy;
 
 pub struct TableState<'a> {
-    pub bet: u32,
-    pub current_hand_value: &'a Vec<u8>,
+    pub players_state: PlayerSimState<'a>,
     pub dealers_card: Rc<Card>,
 }
 
@@ -93,7 +92,7 @@ impl BlackjackTableSim {
 }
 
 /// TODO: Implement missing methods on the blackjack table interface
-impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
+impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
     fn new(starting_balance: f32, n_decks: usize, n_shuffles: u32) -> Self {
         let dealers_hand = DealersHandSim::new();
         let deck = Deck::new(n_decks);
@@ -202,23 +201,6 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         player.stand();
     }
 
-    /// Takes a `PlayerSim<S>` struct, a HashMap<i32, String> representing the options available during the current turn (these options will be decided during runtime), and an i32 `option`.
-    /// The method decides what method to call the implements the appropriate logic, returns a `Result<(), BlackjackGameError>` since the method is fallible.
-    fn play_option(
-        &mut self,
-        player: &mut PlayerSim<S>,
-        options: &std::collections::HashMap<i32, String>,
-        option: i32,
-    ) -> Result<(), BlackjackGameError> {
-        match options.get(&option) {
-            Some(s) if s == "stand" => Ok(self.stand(player)),
-            Some(s) if s == "hit" => Ok(self.hit(player)),
-            Some(s) if s == "split" => Ok(self.split(player)),
-            Some(s) if s == "double down" => Ok(self.double_down(player)),
-            _ => Err(BlackjackGameError::new("option not available".to_string())),
-        }
-    }
-
     /// Method that computes and returns the optimal final hand for the dealer at the end of a hand of blackjack
     fn get_dealers_optimal_final_hand(&mut self) -> u8 {
         // Reveal dealers face down card here
@@ -303,5 +285,24 @@ impl<S: CountingStrategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         self.hand_log = Some((hands_won, hands_pushed, hands_lost, winnings));
         player.reset();
         self.reset();
+    }
+}
+
+impl BlackjackTableSim {
+    /// Takes a `PlayerSim<S>` struct, a HashMap<i32, String> representing the options available during the current turn (these options will be decided during runtime), and an i32 `option`.
+    /// The method decides what method to call the implements the appropriate logic, returns a `Result<(), BlackjackGameError>` since the method is fallible.
+    fn play_option<S: Strategy>(
+        &mut self,
+        player: &mut PlayerSim<S>,
+        options: &HashSet<String>,
+        option: String,
+    ) -> Result<(), BlackjackGameError> {
+        match options.get(&option) {
+            Some(s) if s == "stand" => Ok(self.stand(player)),
+            Some(s) if s == "hit" => Ok(self.hit(player)),
+            Some(s) if s == "split" => Ok(self.split(player)),
+            Some(s) if s == "double down" => Ok(self.double_down(player)),
+            _ => Err(BlackjackGameError::new("option not available".to_string())),
+        }
     }
 }
