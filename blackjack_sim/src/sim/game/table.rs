@@ -6,10 +6,10 @@ use std::rc::Rc;
 
 // use super::strategy::CountingStrategy;
 
-pub struct TableState<'a> {
-    pub players_state: PlayerSimState<'a>,
-    pub dealers_card: Rc<Card>,
-}
+// pub struct TableState<'a> {
+//     pub players_state: PlayerSimState<'a>,
+//     pub dealers_card: Rc<Card>,
+// }
 
 struct DealersHandSim {
     hand: Vec<Rc<Card>>,

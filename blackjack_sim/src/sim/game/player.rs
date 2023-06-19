@@ -1,7 +1,7 @@
 use crate::sim::game::strategy::Strategy;
 use crate::sim::game::table::TableState;
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Struct that holds the players current state to be used for a decision policy
@@ -11,6 +11,7 @@ pub struct PlayerSimState<'a> {
     pub bet: u32,
     pub true_count: i32,
     pub running_count: i32,
+    pub balance: f32,
 }
 
 /// Struct for a simulated player
