@@ -42,7 +42,7 @@ impl<'a> TableState<'a> {
 /// A trait that allows for a fully customizeable blackjack strategy. Can accomodate complex card counting strategies.
 pub trait Strategy {
     fn update(&mut self, card: Rc<Card>);
-    fn bet<'a>(&self, decision_state: TableState<'a>) -> u32;
+    fn bet<'a>(&self, balance: f32) -> u32;
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
@@ -64,27 +64,33 @@ pub trait DecisionStrategy {
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
 pub trait BettingStrategy {
-    fn bet<'a>(&self, decision_state: TableState<'a>) -> u32;
+    fn bet(&self, running_count: i32, true_count: i32, balance: f32) -> u32;
 }
 
-/// Struct that encapsulates the logic needed for a simple margin based betting strategy, will take in a `TableState`
-/// struct and decide to increase/decrease the bet according to the margin and minimum bet
+/// Struct that encapsulates the logic needed for a simple margin based betting strategy, i.e. for each positive value that the true count takes it will compute the bet as
+/// `self.min_bet` * `self.margin` * true_count
 pub struct MarginBettingStrategy {
     margin: f32,
     min_bet: u32,
 }
 
 impl MarginBettingStrategy {
-    /// A simple margin betting strategy, for each positive value of true count this strategy returns the product of the minimum bet, true count and margin
-    fn bet<'a>(&self, decision_state: TableState<'a>) -> u32 {
-        if decision_state.true_count > 0 {
+    /// Associated method for returning a new `MarginBettingStrategy` struct
+    fn new(margin: f32, min_bet: u32) -> MarginBettingStrategy {
+        MarginBettingStrategy { margin, min_bet }
+    }
+}
+
+impl BettingStrategy for MarginBettingStrategy {
+    /// Returns the bet based on the true count, if the true count is greater than zero the product of the true count minimum bet and the margin is returned
+    fn bet(&self, running_count: i32, true_count: i32, balance: f32) -> u32 {
+        if true_count > 0 {
             u32::min(
-                decision_state.balance as u32,
-                f32::floor((self.min_bet as f32) * self.margin * decision_state.true_count as f32)
-                    as u32,
+                balance as u32,
+                ((true_count as f32) * (self.min_bet as f32) * self.margin) as u32,
             )
         } else {
-            u32::min(decision_state.balance as u32, self.min_bet)
+            u32::min(balance as u32, self.min_bet)
         }
     }
 }
@@ -415,8 +421,9 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
     }
 
     /// Method that returns a bet according to `decision_state`
-    fn bet<'a>(&self, decision_state: TableState<'a>) -> u32 {
-        self.betting_strategy.bet(decision_state)
+    fn bet<'a>(&self, balance: f32) -> u32 {
+        self.betting_strategy
+            .bet(self.running_count, self.true_count, balance)
     }
 
     /// Method for making a decision with regards to playing a hand.
