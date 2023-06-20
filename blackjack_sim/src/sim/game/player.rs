@@ -1,18 +1,9 @@
 use crate::sim::game::strategy::Strategy;
-use crate::sim::game::table::TableState;
+use crate::sim::game::strategy::TableState;
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::rc::Rc;
-
-/// Struct that holds the players current state to be used for a decision policy
-pub struct PlayerSimState<'a> {
-    pub hand: &'a Vec<Rc<Card>>,
-    pub hand_value: &'a Vec<u8>,
-    pub bet: u32,
-    pub true_count: i32,
-    pub running_count: i32,
-    pub balance: f32,
-}
 
 /// Struct for a simulated player
 pub struct PlayerSim<S: Strategy> {
@@ -37,6 +28,16 @@ impl<S: Strategy> PlayerSim<S> {
             balance: starting_balance,
             strategy,
         }
+    }
+
+    /// Method for determining whether or not the players turn is over
+    pub fn turn_is_over(&self) -> bool {
+        self.hand_idx == self.hand.len()
+    }
+
+    /// Method for determining whether the player can continue to play or not
+    pub fn continue_play(&self, min_bet: u32) -> bool {
+        (self.balance as u32) >= min_bet
     }
 
     /// Getter method for the players current bet
@@ -137,11 +138,8 @@ impl<S: Strategy> PlayerSim<S> {
                     || self.hand_values[self.hand_idx][1] == 11
             } else {
                 self.hand_values[self.hand_idx][0] == 9
-                    || self.hand_values[self.hand_idx][1] == 9
                     || self.hand_values[self.hand_idx][0] == 10
-                    || self.hand_values[self.hand_idx][1] == 10
                     || self.hand_values[self.hand_idx][0] == 11
-                    || self.hand_values[self.hand_idx][1] == 11
             }
     }
 
@@ -286,6 +284,20 @@ impl<S: Strategy> PlayerSim<S> {
         }
     }
 
+    /// Method for returning a valid option given the state of the table
+    pub fn decide_option(&self, dealers_up_card: Rc<Card>) -> Result<String, BlackjackGameError> {
+        let options = self.get_playing_options();
+        let current_state = self.strategy.get_current_table_state(
+            &self.hand[self.hand_idx],
+            &self.hand_values[self.hand_idx],
+            self.get_current_bet(),
+            self.balance,
+            dealers_up_card,
+        );
+
+        self.strategy.decide_option(current_state, options)
+    }
+
     pub fn reset(&mut self) {
         self.hand = vec![vec![]];
         self.hand_values = vec![vec![]];
@@ -296,3 +308,29 @@ impl<S: Strategy> PlayerSim<S> {
 }
 
 impl<S: Strategy> Player for PlayerSim<S> {}
+
+impl<S: Strategy> Display for PlayerSim<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:<12}{:?}\n\
+                   {:<12}{:?}\n\
+                   {:<12}{:?}\n\
+                   {:<12}{:?}\n\
+                   {:<12}{}\n\
+                   {:<12}${:.2}\n",
+            "hand:",
+            self.hand,
+            "hand_value:",
+            self.hand_values,
+            "bets:",
+            self.bets,
+            "bets_log:",
+            self.bets_log,
+            "hand_idx:",
+            self.hand_idx,
+            "balance:",
+            self.balance
+        )
+    }
+}

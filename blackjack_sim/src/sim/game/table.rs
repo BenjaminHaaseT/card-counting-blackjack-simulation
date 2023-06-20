@@ -1,8 +1,12 @@
-use crate::sim::game::player::{PlayerSim, PlayerSimState};
-use crate::sim::game::strategy::Strategy;
+use crate::sim::game::player::PlayerSim;
+use crate::sim::game::strategy::{
+    BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
+};
 use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
 use std::collections::HashSet;
 use std::rc::Rc;
+
+// use super::strategy::DecisionStrategy;
 
 // use super::strategy::CountingStrategy;
 
@@ -126,6 +130,8 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
 
     /// Simulates dealing a hand of blackjack, the method may panic if `player` has not placed a valid bet.
     fn deal_hand(&mut self, player: &mut PlayerSim<S>) {
+        assert!(!player.bets.is_empty());
+
         if self.deck.shuffle_flag {
             self.deck.shuffle(self.n_shuffles);
         }
@@ -294,7 +300,7 @@ impl BlackjackTableSim {
     fn play_option<S: Strategy>(
         &mut self,
         player: &mut PlayerSim<S>,
-        options: &HashSet<String>,
+        options: HashSet<String>,
         option: String,
     ) -> Result<(), BlackjackGameError> {
         match options.get(&option) {
@@ -305,4 +311,66 @@ impl BlackjackTableSim {
             _ => Err(BlackjackGameError::new("option not available".to_string())),
         }
     }
+}
+
+#[test]
+fn test_single_hand() {
+    let betting_strategy = MarginBettingStrategy::new(3.0, 5);
+    let decision_strategy = BasicStrategy::new();
+    let hilo = HiLo::new(6, 5, betting_strategy, decision_strategy);
+    let mut player = PlayerSim::new(500.0, hilo);
+    let mut table = <BlackjackTableSim as BlackjackTable<
+        PlayerSim<HiLo<MarginBettingStrategy, BasicStrategy>>,
+    >>::new(f32::MAX, 6, 7);
+
+    // Get the bet from the player and place a bet
+    let bet = if let Ok(b) = player.bet() {
+        b
+    } else {
+        panic!("player returned a bet of 0");
+    };
+    player.place_bet(bet as f32);
+
+    // Display the player struct for debuggin purposes
+    println!("{}", player);
+
+    table.deal_hand(&mut player);
+
+    println!("{}", player);
+
+    // Display dealers hand for debugging purposes
+    println!("dealers_hand: {:?}", table.dealers_hand.hand);
+    println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
+    println!();
+
+    if player.turn_is_over() || !player.continue_play(5) {
+        println!("ended early, either player or dealer has blackjack");
+        return;
+    }
+
+    // Get the options from the player
+    let options = player.get_playing_options();
+
+    println!("playing options = {:?}", options);
+
+    let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
+
+    if decision_result.is_ok() {
+        println!("option chosen = {}", decision_result.as_ref().ok().unwrap());
+    } else {
+        panic!("player did not choose a valid option");
+    }
+
+    println!();
+
+    // Play the current option
+    if let Err(e) = table.play_option(&mut player, options, decision_result.unwrap()) {
+        println!("error occurred: {e}");
+        panic!();
+    }
+
+    // Display state of player
+    println!("{}", player);
+
+    assert!(true);
 }

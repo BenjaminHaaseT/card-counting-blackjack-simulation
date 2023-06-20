@@ -1,4 +1,4 @@
-use crate::sim::game::player::PlayerSimState;
+// use crate::sim::game::player::PlayerSimState;
 // use crate::sim::game::table::TableState;
 use blackjack_lib::console::player;
 use blackjack_lib::{BlackjackGameError, Card};
@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 /// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and or place a bet.
-/// Meant as a conveince for reducing the number of arguments passed to methods ot a struct that implements `Strategy`.
+/// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`.
 pub struct TableState<'a> {
     hand: &'a Vec<Rc<Card>>,
     hand_value: &'a Vec<u8>,
@@ -46,8 +46,16 @@ pub trait Strategy {
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
-        options: &HashSet<String>,
+        options: HashSet<String>,
     ) -> Result<String, BlackjackGameError>;
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Rc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Rc<Card>,
+    ) -> TableState<'a>;
 }
 
 /// Trait for a generic decision strategy. Has only one required method `decide_option()`,
@@ -58,7 +66,7 @@ pub trait DecisionStrategy {
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
-        options: &HashSet<String>,
+        options: HashSet<String>,
     ) -> Result<String, BlackjackGameError>;
 }
 
@@ -76,7 +84,7 @@ pub struct MarginBettingStrategy {
 
 impl MarginBettingStrategy {
     /// Associated method for returning a new `MarginBettingStrategy` struct
-    fn new(margin: f32, min_bet: u32) -> MarginBettingStrategy {
+    pub fn new(margin: f32, min_bet: u32) -> MarginBettingStrategy {
         MarginBettingStrategy { margin, min_bet }
     }
 }
@@ -114,11 +122,10 @@ impl BasicStrategy {
     ) {
         // Populate hard_totals lookup table
         let mut hard_totals: HashMap<(u8, u8), String> = HashMap::new();
-        for i in 9..=21 {
+        for i in 2..=21 {
             for j in 1..=10 {
                 let mut option = String::new();
                 match i {
-                    2..=8 => option.push_str("hit"),
                     9 => match j {
                         3..=6 => option.push_str("double down"),
                         _ => option.push_str("hit"),
@@ -137,6 +144,7 @@ impl BasicStrategy {
                         _ => option.push_str("hit"),
                     },
                     17 => option.push_str("stand"),
+                    _ => option.push_str("hit"),
                 }
                 hard_totals.insert((i, j), option);
             }
@@ -195,6 +203,7 @@ impl BasicStrategy {
                         _ => option.push_str("default"),
                     },
                     20 => option.push_str("default"),
+                    _ => todo!(),
                 }
 
                 pair_totals.insert((i, j), option);
@@ -223,79 +232,6 @@ impl BasicStrategy {
             surrender,
         }
     }
-
-    // /// Method for deciding how to play the current hand given the appropriate data
-    // pub fn decide_option<'a>(
-    //     &self,
-    //     decision_state: TableState<'a>,
-    //     options: &HashSet<String>,
-    // ) -> Result<String, BlackjackGameError> {
-    //     let mut option = String::new();
-    //     let dealers_card = decision_state.dealers_up_card.val;
-
-    //     // First check if we should surrender or not
-    //     if options.contains("surrender") {
-    //         if let Some(o) = self
-    //             .surrender
-    //             .get(&(decision_state.hand_value[0], dealers_card))
-    //         {
-    //             option.push_str(o.as_str());
-    //         }
-    //     }
-
-    //     if option.is_empty() && options.contains("split") {
-    //         if let Some(o) = self
-    //             .pair_totals
-    //             .get(&(decision_state.hand_value[0], dealers_card))
-    //         {
-    //             if o == "split" {
-    //                 option.push_str(o);
-    //             }
-    //         }
-    //     }
-
-    //     // Check if players hand is a soft total, if so default ot soft totals lookup table
-    //     if options.is_empty() && decision_state.hand_value.len() == 2 {
-    //         match self
-    //             .soft_totals
-    //             .get(&(decision_state.hand_value[0], dealers_card))
-    //         {
-    //             Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
-    //             Some(o) if o == "double down" && !options.contains("double down") => {
-    //                 option.push_str("hit");
-    //             }
-    //             _ => {
-    //                 return Err(BlackjackGameError {
-    //                     message: "option {o} not a valid choice".to_string(),
-    //                 })
-    //             }
-    //         }
-    //     }
-
-    //     if options.is_empty() {
-    //         match self
-    //             .hard_totals
-    //             .get(&(decision_state.hand_value[0], dealers_card))
-    //         {
-    //             Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
-    //             Some(o) if o == "double down" && !options.contains("double down") => {
-    //                 option.push_str("hit");
-    //             }
-    //             _ => {
-    //                 return Err(BlackjackGameError {
-    //                     message: "option {o} not a valid choice".to_string(),
-    //                 })
-    //             }
-    //         }
-    //     }
-
-    //     match option.is_empty() {
-    //         true => Err(BlackjackGameError {
-    //             message: "valid option was not selected".to_string(),
-    //         }),
-    //         false => Ok(option),
-    //     }
-    // }
 }
 
 impl DecisionStrategy for BasicStrategy {
@@ -303,7 +239,7 @@ impl DecisionStrategy for BasicStrategy {
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
-        options: &HashSet<String>,
+        options: HashSet<String>,
     ) -> Result<String, BlackjackGameError> {
         let mut option = String::new();
         let dealers_card = decision_state.dealers_up_card.val;
@@ -330,7 +266,7 @@ impl DecisionStrategy for BasicStrategy {
         }
 
         // Check if players hand is a soft total, if so default ot soft totals lookup table
-        if options.is_empty() && decision_state.hand_value.len() == 2 {
+        if option.is_empty() && decision_state.hand_value.len() == 2 {
             match self
                 .soft_totals
                 .get(&(decision_state.hand_value[0], dealers_card))
@@ -347,7 +283,7 @@ impl DecisionStrategy for BasicStrategy {
             }
         }
 
-        if options.is_empty() {
+        if option.is_empty() {
             match self
                 .hard_totals
                 .get(&(decision_state.hand_value[0], dealers_card))
@@ -364,12 +300,13 @@ impl DecisionStrategy for BasicStrategy {
             }
         }
 
-        match option.is_empty() {
-            true => Err(BlackjackGameError {
-                message: "valid option was not selected".to_string(),
-            }),
-            false => Ok(option),
+        if option.is_empty() {
+            return Err(BlackjackGameError {
+                message: "no valid option was selected".to_string(),
+            });
         }
+
+        Ok(option)
     }
 }
 
@@ -386,7 +323,7 @@ pub struct HiLo<B: BettingStrategy, D: DecisionStrategy> {
 
 impl<B: BettingStrategy, D: DecisionStrategy> HiLo<B, D> {
     /// Associated method for creating a new HiLo struct
-    fn new(n_decks: u32, min_bet: u32, betting_strategy: B, decision_strategy: D) -> Self {
+    pub fn new(n_decks: u32, min_bet: u32, betting_strategy: B, decision_strategy: D) -> Self {
         // Initialize lookup table
         let mut lookup_table = HashMap::new();
         for i in 2..7 {
@@ -431,9 +368,29 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
-        options: &HashSet<String>,
+        options: HashSet<String>,
     ) -> Result<String, BlackjackGameError> {
         self.decision_strategy
             .decide_option(decision_state, options)
+    }
+
+    /// Method for getting the current state of the table
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Rc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Rc<Card>,
+    ) -> TableState<'a> {
+        TableState::new(
+            hand,
+            hand_value,
+            bet,
+            balance,
+            self.running_count,
+            self.true_count,
+            dealers_up_card,
+        )
     }
 }
