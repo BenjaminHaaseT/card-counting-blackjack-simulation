@@ -3,6 +3,7 @@
 use blackjack_lib::console::player;
 use blackjack_lib::{BlackjackGameError, Card};
 use std::collections::{HashMap, HashSet};
+use std::fmt::Display;
 use std::rc::Rc;
 
 /// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and or place a bet.
@@ -13,7 +14,7 @@ pub struct TableState<'a> {
     bet: u32,
     balance: f32,
     running_count: i32,
-    true_count: i32,
+    true_count: f32,
     dealers_up_card: Rc<Card>,
 }
 
@@ -24,7 +25,7 @@ impl<'a> TableState<'a> {
         bet: u32,
         balance: f32,
         running_count: i32,
-        true_count: i32,
+        true_count: f32,
         dealers_up_card: Rc<Card>,
     ) -> TableState<'a> {
         TableState {
@@ -72,7 +73,7 @@ pub trait DecisionStrategy {
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
 pub trait BettingStrategy {
-    fn bet(&self, running_count: i32, true_count: i32, balance: f32) -> u32;
+    fn bet(&self, running_count: i32, true_count: f32, balance: f32) -> u32;
 }
 
 /// Struct that encapsulates the logic needed for a simple margin based betting strategy, i.e. for each positive value that the true count takes it will compute the bet as
@@ -91,11 +92,12 @@ impl MarginBettingStrategy {
 
 impl BettingStrategy for MarginBettingStrategy {
     /// Returns the bet based on the true count, if the true count is greater than zero the product of the true count minimum bet and the margin is returned
-    fn bet(&self, running_count: i32, true_count: i32, balance: f32) -> u32 {
-        if true_count > 0 {
+    fn bet(&self, running_count: i32, true_count: f32, balance: f32) -> u32 {
+        if true_count > 0.0 {
+            let scalar = 10.0 * true_count;
             u32::min(
                 balance as u32,
-                ((true_count as f32) * (self.min_bet as f32) * self.margin) as u32,
+                ((self.min_bet as f32) * scalar * self.margin) as u32,
             )
         } else {
             u32::min(balance as u32, self.min_bet)
@@ -143,7 +145,7 @@ impl BasicStrategy {
                         2..=6 => option.push_str("stand"),
                         _ => option.push_str("hit"),
                     },
-                    17 => option.push_str("stand"),
+                    17..=21 => option.push_str("stand"),
                     _ => option.push_str("hit"),
                 }
                 hard_totals.insert((i, j), option);
@@ -266,19 +268,36 @@ impl DecisionStrategy for BasicStrategy {
         }
 
         // Check if players hand is a soft total, if so default ot soft totals lookup table
-        if option.is_empty() && decision_state.hand_value.len() == 2 {
-            match self
+        if option.is_empty()
+            && decision_state.hand_value.len() == 2
+            && decision_state.hand_value[1] <= 21
+        {
+            // match self
+            //     .soft_totals
+            //     .get(&(decision_state.hand_value[0], dealers_card))
+            // {
+            //     Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
+            //     Some(o) if o == "double down" && !options.contains("double down") => {
+            //         option.push_str("hit");
+            //     }
+            //     _ => {
+            //         return Err(BlackjackGameError {
+            //             message: format!("option {} not a valid choice",),
+            //         })
+            //     }
+            // }
+            if let Some(opt) = self
                 .soft_totals
                 .get(&(decision_state.hand_value[0], dealers_card))
             {
-                Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
-                Some(o) if o == "double down" && !options.contains("double down") => {
+                if options.contains(opt.as_str()) {
+                    option.push_str(opt.as_str());
+                } else if opt == "double down" && !options.contains("double down") {
                     option.push_str("hit");
-                }
-                _ => {
+                } else {
                     return Err(BlackjackGameError {
-                        message: "option {o} not a valid choice".to_string(),
-                    })
+                        message: format!("option chosen: {}, not available for valid options {:?} with soft total of {}", opt, options, decision_state.hand_value[0])
+                    });
                 }
             }
         }
@@ -313,7 +332,7 @@ impl DecisionStrategy for BasicStrategy {
 /// Struct that implements a simple HiLo betting strategy
 pub struct HiLo<B: BettingStrategy, D: DecisionStrategy> {
     running_count: i32,
-    true_count: i32,
+    true_count: f32,
     total_cards_counted: u32,
     n_decks: u32,
     betting_strategy: B,
@@ -337,7 +356,7 @@ impl<B: BettingStrategy, D: DecisionStrategy> HiLo<B, D> {
 
         HiLo {
             running_count: 0,
-            true_count: 0,
+            true_count: 0.0,
             total_cards_counted: 0,
             n_decks,
             betting_strategy,
@@ -354,7 +373,7 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
         self.running_count += self.lookup_table[&card_val];
         self.total_cards_counted += 1;
         let decks_played = self.n_decks - ((self.total_cards_counted / 52) as u32);
-        self.true_count = self.running_count / (decks_played as i32);
+        self.true_count = (self.running_count as f32) / (decks_played as f32);
     }
 
     /// Method that returns a bet according to `decision_state`
@@ -391,6 +410,24 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
             self.running_count,
             self.true_count,
             dealers_up_card,
+        )
+    }
+}
+
+impl<B: BettingStrategy, D: DecisionStrategy> Display for HiLo<B, D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            format!(
+                "{:<21}:{}\n{:<21}:{}\n{:<21}:{}",
+                "running_count:",
+                self.running_count,
+                "true_count:",
+                self.true_count,
+                "total_cards_counted:",
+                self.total_cards_counted,
+            )
         )
     }
 }

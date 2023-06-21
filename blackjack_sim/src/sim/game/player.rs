@@ -124,15 +124,19 @@ impl<S: Strategy> PlayerSim<S> {
 
     /// Returns a boolean, true if the `PlayerSim` instance can split their hand, false otherwise.
     fn can_split(&self) -> bool {
-        self.hand.len() < 4 && self.hand[self.hand_idx][0].rank == self.hand[self.hand_idx][1].rank
+        self.hand.len() < 4
+            && self.hand[self.hand_idx].len() == 2
+            && self.hand[self.hand_idx][0].rank == self.hand[self.hand_idx][1].rank
     }
 
     /// Returns a boolean, true if the `PlayerSim` can double down, false otherwise.
     fn can_double_down(&self) -> bool {
         self.hand_idx == 0
+            && (self.bets[self.hand_idx] as f32) <= self.balance
             && if self.hand_values[self.hand_idx].len() == 2 {
                 self.hand_values[self.hand_idx][0] == 9
-                    || self.hand_values[self.hand_idx][0] == 9
+                    || self.hand_values[self.hand_idx][1] == 9
+                    || self.hand_values[self.hand_idx][0] == 10
                     || self.hand_values[self.hand_idx][1] == 10
                     || self.hand_values[self.hand_idx][0] == 11
                     || self.hand_values[self.hand_idx][1] == 11
@@ -260,11 +264,12 @@ impl<S: Strategy> PlayerSim<S> {
         }
 
         let hand2: u8 = self.hand[self.hand_idx + 1].iter().map(|c| c.val).sum();
-        self.hand_values[self.hand_idx].push(hand2);
+        self.hand_values[self.hand_idx + 1].push(hand2);
         if hand2 <= 11
-            && (self.hand[self.hand_idx][0].rank == "A" || self.hand[self.hand_idx][1].rank == "A")
+            && (self.hand[self.hand_idx + 1][0].rank == "A"
+                || self.hand[self.hand_idx + 1][1].rank == "A")
         {
-            self.hand_values[self.hand_idx].push(hand2 + 10);
+            self.hand_values[self.hand_idx + 1].push(hand2 + 10);
         }
     }
 
@@ -309,16 +314,43 @@ impl<S: Strategy> PlayerSim<S> {
 
 impl<S: Strategy> Player for PlayerSim<S> {}
 
-impl<S: Strategy> Display for PlayerSim<S> {
+// impl<S: Strategy> Display for PlayerSim<S> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "{:<14}{:?}\n\
+//                    {:<14}{:?}\n\
+//                    {:<14}{:?}\n\
+//                    {:<14}{:?}\n\
+//                    {:<14}{}\n\
+//                    {:<14}${:.2}\n",
+//             "hand:",
+//             self.hand,
+//             "hand_value:",
+//             self.hand_values,
+//             "bets:",
+//             self.bets,
+//             "bets_log:",
+//             self.bets_log,
+//             "hand_idx:",
+//             self.hand_idx,
+//             "balance:",
+//             self.balance
+//         )
+//     }
+// }
+
+impl<S: Strategy + Display> Display for PlayerSim<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:<12}{:?}\n\
-                   {:<12}{:?}\n\
-                   {:<12}{:?}\n\
-                   {:<12}{:?}\n\
-                   {:<12}{}\n\
-                   {:<12}${:.2}\n",
+            "{:<21}{:?}\n\
+                   {:<21}{:?}\n\
+                   {:<21}{:?}\n\
+                   {:<21}{:?}\n\
+                   {:<21}{}\n\
+                   {:<21}${:.2}\n\
+                   {}",
             "hand:",
             self.hand,
             "hand_value:",
@@ -330,7 +362,8 @@ impl<S: Strategy> Display for PlayerSim<S> {
             "hand_idx:",
             self.hand_idx,
             "balance:",
-            self.balance
+            self.balance,
+            self.strategy,
         )
     }
 }

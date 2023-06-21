@@ -15,9 +15,9 @@ use std::rc::Rc;
 //     pub dealers_card: Rc<Card>,
 // }
 
-struct DealersHandSim {
-    hand: Vec<Rc<Card>>,
-    hand_value: Vec<u8>,
+pub struct DealersHandSim {
+    pub hand: Vec<Rc<Card>>,
+    pub hand_value: Vec<u8>,
 }
 
 impl DealersHandSim {
@@ -81,7 +81,7 @@ pub struct BlackjackTableSim {
     pub balance: f32,
     pub hand_log: Option<(i32, i32, i32, f32)>,
     final_cards: Vec<Rc<Card>>,
-    dealers_hand: DealersHandSim,
+    pub dealers_hand: DealersHandSim,
     // bet_data: Vec<f32>,
     // n_decks: usize,
     n_shuffles: u32,
@@ -89,7 +89,7 @@ pub struct BlackjackTableSim {
 }
 
 impl BlackjackTableSim {
-    fn reset(&mut self) {
+    pub fn reset(&mut self) {
         self.final_cards.clear();
         self.dealers_hand.reset();
     }
@@ -250,7 +250,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         self.dealers_hand.hand_value[0]
     }
 
-    //TODO: Need to find a way of recording what bets were won/lost in an efficient way
+    /// Method for finishing the hand and deciding what bet(s) `player` wins or loses
     fn finish_hand(&mut self, player: &mut PlayerSim<S>) {
         if let Some(players_final_hands) = player.get_optimal_hands() {
             let dealers_optimal_hand =
@@ -268,6 +268,8 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
                 }
             }
         }
+        // Update the players strategy
+        player.update_strategy(self.final_cards.iter());
 
         let (mut hands_won, mut hands_pushed, mut hands_lost, mut winnings) = (0, 0, 0, 0.0);
         for (_, bet) in player.bets_log.iter() {
@@ -289,15 +291,16 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         }
 
         self.hand_log = Some((hands_won, hands_pushed, hands_lost, winnings));
-        player.reset();
-        self.reset();
+        // TODO: for debugging purposes do not reset hands yet
+        // player.reset();
+        // self.reset();
     }
 }
 
 impl BlackjackTableSim {
     /// Takes a `PlayerSim<S>` struct, a HashMap<i32, String> representing the options available during the current turn (these options will be decided during runtime), and an i32 `option`.
     /// The method decides what method to call the implements the appropriate logic, returns a `Result<(), BlackjackGameError>` since the method is fallible.
-    fn play_option<S: Strategy>(
+    pub fn play_option<S: Strategy>(
         &mut self,
         player: &mut PlayerSim<S>,
         options: HashSet<String>,
@@ -371,6 +374,143 @@ fn test_single_hand() {
 
     // Display state of player
     println!("{}", player);
+
+    assert!(true);
+}
+
+#[test]
+fn test_single_hand_loop() {
+    let betting_strategy = MarginBettingStrategy::new(3.0, 5);
+    let decision_strategy = BasicStrategy::new();
+    let hilo = HiLo::new(6, 5, betting_strategy, decision_strategy);
+    let mut player = PlayerSim::new(500.0, hilo);
+    let mut table = <BlackjackTableSim as BlackjackTable<
+        PlayerSim<HiLo<MarginBettingStrategy, BasicStrategy>>,
+    >>::new(f32::MAX, 6, 7);
+
+    // Get bet from player
+    let bet = match player.bet() {
+        Ok(b) if b >= 5 => b,
+        Ok(b) => {
+            eprintln!("error: {b} is not a valid bet with a minimum bet of 5");
+            return ();
+        }
+        Err(e) => {
+            eprintln!("error: {e}");
+            return ();
+        }
+    };
+
+    player.place_bet(bet as f32);
+
+    // Display player
+    println!("{}", player);
+    println!();
+
+    table.deal_hand(&mut player);
+
+    println!("{}", player);
+    println!();
+
+    while !player.turn_is_over() {
+        println!("dealers_hand: {:?}", table.dealers_hand.hand);
+        println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
+        println!();
+
+        if player.turn_is_over() || !player.continue_play(5) {
+            println!("ended early, either player or dealer has blackjack");
+            return ();
+        }
+
+        // Get options
+        let options = player.get_playing_options();
+        println!("options: {:?}", options);
+
+        let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
+
+        let decision = match decision_result {
+            Ok(d) => {
+                println!("chosen option: {d}");
+                d
+            }
+            Err(e) => {
+                eprintln!("error: {e}");
+                return ();
+            }
+        };
+
+        println!();
+
+        if let Err(e) = table.play_option(&mut player, options, decision) {
+            eprintln!("error: {e}");
+            return ();
+        }
+
+        // Display player again for debugging
+        println!("{}", player);
+
+        println!();
+    }
+
+    // Display player again
+    println!("{}", player);
+    println!();
+
+    table.finish_hand(&mut player);
+
+    println!("{}", player);
+    println!();
+
+    println!("dealers_hand: {:?}", table.dealers_hand.hand);
+    println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
+
+    println!("bets_log: {:?}", table.hand_log);
+    // // Display player
+    // println!("{}", player);
+    // println!();
+
+    // table.deal_hand(&mut player);
+
+    // println!("{}", player);
+    // println!();
+
+    // println!("dealers_hand: {:?}", table.dealers_hand.hand);
+    // println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
+    // println!();
+
+    // if player.turn_is_over() || !player.continue_play(5) {
+    //     println!("ended early, either player or dealer has blackjack");
+    //     return;
+    // }
+
+    // // Get options
+    // let options = player.get_playing_options();
+    // println!("options: {:?}", options);
+
+    // let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
+
+    // let decision = match decision_result {
+    //     Ok(d) => {
+    //         println!("chosen option: {d}");
+    //         d
+    //     }
+    //     Err(e) => {
+    //         eprintln!("error: {e}");
+    //         return ();
+    //     }
+    // };
+
+    // println!();
+
+    // if let Err(e) = table.play_option(&mut player, options, decision) {
+    //     eprintln!("error: {e}");
+    //     return ();
+    // }
+
+    // // Display player again for debugging
+    // println!("{}", player);
+
+    // println!();
 
     assert!(true);
 }
