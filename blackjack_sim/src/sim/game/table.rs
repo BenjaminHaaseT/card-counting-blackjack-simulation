@@ -6,15 +6,6 @@ use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
 use std::collections::HashSet;
 use std::rc::Rc;
 
-// use super::strategy::DecisionStrategy;
-
-// use super::strategy::CountingStrategy;
-
-// pub struct TableState<'a> {
-//     pub players_state: PlayerSimState<'a>,
-//     pub dealers_card: Rc<Card>,
-// }
-
 pub struct DealersHandSim {
     pub hand: Vec<Rc<Card>>,
     pub hand_value: Vec<u8>,
@@ -82,18 +73,13 @@ pub struct BlackjackTableSim {
     pub hand_log: Option<(i32, i32, i32, f32)>,
     final_cards: Vec<Rc<Card>>,
     pub dealers_hand: DealersHandSim,
-    // bet_data: Vec<f32>,
+    pub num_player_blackjacks: i32,
     // n_decks: usize,
     n_shuffles: u32,
     deck: Deck,
 }
 
-impl BlackjackTableSim {
-    pub fn reset(&mut self) {
-        self.final_cards.clear();
-        self.dealers_hand.reset();
-    }
-}
+// impl BlackjackTableSim {}
 
 /// TODO: Implement missing methods on the blackjack table interface
 impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
@@ -105,6 +91,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             hand_log: None,
             final_cards: vec![],
             dealers_hand,
+            num_player_blackjacks: 0,
             n_shuffles,
             deck,
         }
@@ -133,8 +120,12 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         assert!(!player.bets.is_empty());
 
         if self.deck.shuffle_flag {
+            // For debugging purposes eventually remove this
+            println!("Shuffling...");
             self.deck.shuffle(self.n_shuffles);
+            player.reset_strategy();
         }
+
         // Now deal cards to player and dealer
         let mut cur_card = self.deck.get_next_card().unwrap();
         player.receive_card(Rc::clone(&cur_card));
@@ -159,6 +150,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             player.update_strategy(Some(&self.dealers_hand.hand[1]));
             if player.has_blackjack() {
                 player.push_current_hand();
+                self.num_player_blackjacks += 1;
             } else {
                 player.lose_current_hand();
             }
@@ -166,6 +158,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             let current_bet = player.get_current_bet() as f32;
             self.balance -= current_bet * 1.5;
             player.blackjack(current_bet * 1.5);
+            self.num_player_blackjacks += 1;
         }
     }
 
@@ -291,9 +284,6 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         }
 
         self.hand_log = Some((hands_won, hands_pushed, hands_lost, winnings));
-        // TODO: for debugging purposes do not reset hands yet
-        // player.reset();
-        // self.reset();
     }
 }
 
@@ -313,6 +303,17 @@ impl BlackjackTableSim {
             Some(s) if s == "double down" => Ok(self.double_down(player)),
             _ => Err(BlackjackGameError::new("option not available".to_string())),
         }
+    }
+
+    /// Getter method for the dealers face up card.
+    pub fn dealers_face_up_card(&self) -> Rc<Card> {
+        Rc::clone(&self.dealers_hand.hand[0])
+    }
+
+    /// Method for reseting the table for another round, does not reshuffle deck.
+    pub fn reset(&mut self) {
+        self.final_cards.clear();
+        self.dealers_hand.reset();
     }
 }
 

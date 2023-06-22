@@ -45,6 +45,11 @@ impl<S: Strategy> PlayerSim<S> {
         self.bets[self.hand_idx]
     }
 
+    /// Getter method for the players current balance.
+    pub fn balance(&self) -> f32 {
+        self.balance
+    }
+
     /// Function for getting an initial bet
     pub fn bet(&mut self) -> Result<u32, BlackjackGameError> {
         let bet = self.strategy.bet(self.balance);
@@ -127,6 +132,7 @@ impl<S: Strategy> PlayerSim<S> {
         self.hand.len() < 4
             && self.hand[self.hand_idx].len() == 2
             && self.hand[self.hand_idx][0].rank == self.hand[self.hand_idx][1].rank
+            && (self.bets[self.hand_idx] as f32) <= self.balance
     }
 
     /// Returns a boolean, true if the `PlayerSim` can double down, false otherwise.
@@ -301,6 +307,10 @@ impl<S: Strategy> PlayerSim<S> {
         );
 
         self.strategy.decide_option(current_state, options)
+    }
+
+    pub fn reset_strategy(&mut self) {
+        self.strategy.reset();
     }
 
     pub fn reset(&mut self) {

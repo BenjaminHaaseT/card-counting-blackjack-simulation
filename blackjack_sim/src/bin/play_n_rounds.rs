@@ -108,16 +108,37 @@ fn main() {
             total_wins += wins;
             total_pushes += pushes;
             total_losses += loses;
+
             total_winnings += winnings;
         }
 
         numb_rounds -= 1;
     }
 
-    println!(
-        "total wins: {}\ntotal pushes: {}\ntotal loses: {}\ntotal winnings: {:20.2}",
-        total_wins, total_pushes, total_losses, total_winnings
+    let width = "number of player blackjacks:".len() + 20;
+    let numeric_display_width = 80 - width;
+    println!("{}", "-".repeat(80));
+    println!("{:-^80}", "stats");
+    let result_str = format!(
+        "{:<width$}{:>numeric_display_width$}\n{:<width$}{:>numeric_display_width$}\n{:<width$}{:>numeric_display_width$}\n{:<width$}{:>numeric_display_width$}",
+        "total wins:",
+        total_wins,
+        "total pushes:",
+        total_pushes,
+        "total losses:",
+        total_losses,
+        "total winnings:",
+        total_winnings
     );
-    println!();
+    println!("{result_str}");
+    println!(
+        "{:<width$}{:>numeric_display_width$.2}",
+        "final balance",
+        player.balance()
+    );
+    println!(
+        "{:<width$}{:>numeric_display_width$}",
+        "number of player blackjacks:", table.num_player_blackjacks,
+    );
     println!("{}", "-".repeat(80));
 }

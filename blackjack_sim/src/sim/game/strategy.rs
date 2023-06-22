@@ -57,6 +57,7 @@ pub trait Strategy {
         balance: f32,
         dealers_up_card: Rc<Card>,
     ) -> TableState<'a>;
+    fn reset(&mut self);
 }
 
 /// Trait for a generic decision strategy. Has only one required method `decide_option()`,
@@ -94,7 +95,7 @@ impl BettingStrategy for MarginBettingStrategy {
     /// Returns the bet based on the true count, if the true count is greater than zero the product of the true count minimum bet and the margin is returned
     fn bet(&self, running_count: i32, true_count: f32, balance: f32) -> u32 {
         if true_count > 0.0 {
-            let scalar = 10.0 * true_count;
+            let scalar = f32::ceil(true_count);
             u32::min(
                 balance as u32,
                 ((self.min_bet as f32) * scalar * self.margin) as u32,
@@ -372,8 +373,8 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
         let card_val = card.val;
         self.running_count += self.lookup_table[&card_val];
         self.total_cards_counted += 1;
-        let decks_played = self.n_decks - ((self.total_cards_counted / 52) as u32);
-        self.true_count = (self.running_count as f32) / (decks_played as f32);
+        let remaining_decks = (self.n_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / remaining_decks;
     }
 
     /// Method that returns a bet according to `decision_state`
@@ -411,6 +412,14 @@ impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
             self.true_count,
             dealers_up_card,
         )
+    }
+
+    /// Method for reseting the count of the current strategy. A counting strategy needs to be reset whenenver the deck gets shuffled again,
+    /// this method provides that functionality.
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
     }
 }
 
