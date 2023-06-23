@@ -80,7 +80,7 @@ fn main() {
 
             println!();
 
-            if let Err(e) = table.play_option(&mut player, options, decision) {
+            if let Err(e) = table.play_option(&mut player, decision) {
                 eprintln!("error: {e}");
                 return ();
             }

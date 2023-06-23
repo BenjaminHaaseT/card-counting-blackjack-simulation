@@ -26,7 +26,7 @@ pub struct BlackjackGameSim<S: Strategy> {
     total_pushes: i32,
     total_losses: i32,
     total_winnings: f32,
-    number_of_player_blackjacks: i32,
+    // number_of_player_blackjacks: i32,
     ended_early: bool,
 }
 
@@ -52,7 +52,7 @@ impl<S: Strategy> BlackjackGameSim<S> {
             total_pushes: 0,
             total_losses: 0,
             total_winnings: 0.0,
-            number_of_player_blackjacks: 0,
+            // number_of_player_blackjacks: 0,
             ended_early: false,
         }
     }
@@ -90,13 +90,12 @@ impl<S: Strategy> BlackjackGameSim<S> {
             // Let player decide options until they are no longer able to
             while !self.player.turn_is_over() {
                 // Get the chosen option from the player, return if it is an error
-                let options = self.player.get_playing_options();
+                // let options = self.player.get_playing_options();
                 let decision = self
                     .player
                     .decide_option(self.table.dealers_face_up_card())?;
                 // Play the given option, return an error if it fails
-                self.table
-                    .play_option(&mut self.player, options, decision)?;
+                self.table.play_option(&mut self.player, decision)?;
             }
 
             // Finish the hand
@@ -148,15 +147,13 @@ impl<S: Strategy> BlackjackGameSim<S> {
             self.player.balance()
         );
         println!(
-            "{:<text_width$}{:numeric_width$}",
-            "number of player blackjacks:", self.number_of_player_blackjacks
+            "{:<text_width$}{:>numeric_width$}",
+            "number of player blackjacks:", self.table.num_player_blackjacks
         );
-        if self.ended_early {
-            println!(
-                "{:<text_width$}{:>numeric_width$}",
-                "ended early:", self.ended_early
-            )
-        }
+        println!(
+            "{:<text_width$}{:>numeric_width$}",
+            "ended early:", self.ended_early
+        );
         println!("{}", "-".repeat(width));
 
         Ok(())

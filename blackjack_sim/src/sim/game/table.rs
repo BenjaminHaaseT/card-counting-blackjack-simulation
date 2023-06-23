@@ -293,14 +293,15 @@ impl BlackjackTableSim {
     pub fn play_option<S: Strategy>(
         &mut self,
         player: &mut PlayerSim<S>,
-        options: HashSet<String>,
+        // options: HashSet<String>,
         option: String,
     ) -> Result<(), BlackjackGameError> {
-        match options.get(&option) {
-            Some(s) if s == "stand" => Ok(self.stand(player)),
-            Some(s) if s == "hit" => Ok(self.hit(player)),
-            Some(s) if s == "split" => Ok(self.split(player)),
-            Some(s) if s == "double down" => Ok(self.double_down(player)),
+        match option.as_str() {
+            "stand" => Ok(self.stand(player)),
+            "hit" => Ok(self.hit(player)),
+            "split" => Ok(self.split(player)),
+            "double down" => Ok(self.double_down(player)),
+            "surrender" => Ok(self.surrender(player)),
             _ => Err(BlackjackGameError::new("option not available".to_string())),
         }
     }
@@ -315,6 +316,9 @@ impl BlackjackTableSim {
         self.final_cards.clear();
         self.dealers_hand.reset();
     }
+
+    //TODO: implement surrender functionality eventually
+    pub fn surrender<S: Strategy>(&self, player: &mut PlayerSim<S>) {}
 }
 
 #[test]
@@ -368,7 +372,7 @@ fn test_single_hand() {
     println!();
 
     // Play the current option
-    if let Err(e) = table.play_option(&mut player, options, decision_result.unwrap()) {
+    if let Err(e) = table.play_option(&mut player, decision_result.unwrap()) {
         println!("error occurred: {e}");
         panic!();
     }
@@ -442,7 +446,7 @@ fn test_single_hand_loop() {
 
         println!();
 
-        if let Err(e) = table.play_option(&mut player, options, decision) {
+        if let Err(e) = table.play_option(&mut player, decision) {
             eprintln!("error: {e}");
             return ();
         }

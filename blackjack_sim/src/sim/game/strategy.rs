@@ -273,20 +273,6 @@ impl DecisionStrategy for BasicStrategy {
             && decision_state.hand_value.len() == 2
             && decision_state.hand_value[1] <= 21
         {
-            // match self
-            //     .soft_totals
-            //     .get(&(decision_state.hand_value[0], dealers_card))
-            // {
-            //     Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
-            //     Some(o) if o == "double down" && !options.contains("double down") => {
-            //         option.push_str("hit");
-            //     }
-            //     _ => {
-            //         return Err(BlackjackGameError {
-            //             message: format!("option {} not a valid choice",),
-            //         })
-            //     }
-            // }
             if let Some(opt) = self
                 .soft_totals
                 .get(&(decision_state.hand_value[0], dealers_card))
