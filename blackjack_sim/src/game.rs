@@ -1,22 +1,23 @@
 //! Module that focuses on the simulation of a single game of blackjack. In otherwords,
 //!  this module provides all the functionality needed to test a single game of blackjack for a given counting strategy.
 
-use crate::sim::game::player::PlayerSim;
-use crate::sim::game::strategy::{
-    BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
-    TableState,
-};
-use crate::sim::game::table::BlackjackTableSim;
-use blackjack_lib::{BlackjackGameError, BlackjackTable, Player};
-use std::io::{self, Write};
-
 pub mod player;
 pub mod strategy;
 pub mod table;
+pub mod prelude {
+    pub use super::BlackjackGameSim;
+    pub use crate::game::player::PlayerSim;
+    pub use crate::game::strategy::prelude::*;
+    pub use crate::game::table::BlackjackTableSim;
+    pub use blackjack_lib::{BlackjackGameError, BlackjackTable, Player};
+    pub use std::io::{self, Write};
+    // pub use BlackjackGameSim;
+}
+
+pub use prelude::*;
 
 /// Struct that provides the functionality to simulate a game of blackjack using a specific counting strategy.
 /// This struct saves all of the necessary data for reporting/logging the stats of the simulation as well.
-// TODO: implement builder pattern
 pub struct BlackjackGameSim<S: Strategy> {
     table: BlackjackTableSim,
     player: PlayerSim<S>,
@@ -58,7 +59,6 @@ impl<S: Strategy> BlackjackGameSim<S> {
     }
 
     /// Method that runs the blackjack simulation the number of times specified during object creation.
-    // TODO: fix algorithm for making a decsion, should be smoother, no need to have the player object recompute what the valid playing options are...
     fn run(&mut self) -> Result<(), BlackjackGameError> {
         for _i in 0..self.num_hands {
             // Check if player can continue
@@ -118,6 +118,7 @@ impl<S: Strategy> BlackjackGameSim<S> {
     }
 
     /// Writes the stats the stats currently recorded to the given writer.
+    // TODO: allow an arbitrary writer to be passed in
     fn write_stats<D: Write>(&self, destination: D) -> io::Result<()> {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks:".len() + 20;

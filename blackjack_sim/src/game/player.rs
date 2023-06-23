@@ -1,5 +1,5 @@
-use crate::sim::game::strategy::Strategy;
-use crate::sim::game::strategy::TableState;
+use crate::game::strategy::Strategy;
+use crate::game::strategy::TableState;
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;

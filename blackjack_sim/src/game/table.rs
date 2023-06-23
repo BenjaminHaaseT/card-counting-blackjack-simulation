@@ -1,5 +1,5 @@
-use crate::sim::game::player::PlayerSim;
-use crate::sim::game::strategy::{
+use crate::game::player::PlayerSim;
+use crate::game::strategy::{
     BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
 };
 use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};

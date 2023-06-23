@@ -1,10 +1,16 @@
 // use crate::sim::game::player::PlayerSimState;
 // use crate::sim::game::table::TableState;
-use blackjack_lib::console::player;
-use blackjack_lib::{BlackjackGameError, Card};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::Rc;
+
+pub mod prelude {
+    pub use super::*;
+    pub use blackjack_lib::console::player;
+    pub use blackjack_lib::{BlackjackGameError, Card};
+}
+
+pub use prelude::*;
 
 /// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and or place a bet.
 /// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`.
@@ -327,6 +333,7 @@ pub struct HiLo<B: BettingStrategy, D: DecisionStrategy> {
     lookup_table: HashMap<u8, i32>,
 }
 
+// TODO: Implement builder pattern for HiLo strategy.
 impl<B: BettingStrategy, D: DecisionStrategy> HiLo<B, D> {
     /// Associated method for creating a new HiLo struct
     pub fn new(n_decks: u32, min_bet: u32, betting_strategy: B, decision_strategy: D) -> Self {

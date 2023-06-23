@@ -1,10 +1,10 @@
 use blackjack_lib::BlackjackTable;
-use blackjack_sim::sim::game::player::{self, PlayerSim};
-use blackjack_sim::sim::game::strategy::{
+use blackjack_sim::game::player::{self, PlayerSim};
+use blackjack_sim::game::strategy::{
     self, BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
     TableState,
 };
-use blackjack_sim::sim::game::table::{self, BlackjackTableSim};
+use blackjack_sim::game::table::{self, BlackjackTableSim};
 use std::f32::MIN;
 use std::rc::Rc;
 
