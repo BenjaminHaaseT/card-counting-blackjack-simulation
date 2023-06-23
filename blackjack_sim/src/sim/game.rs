@@ -16,6 +16,7 @@ pub mod table;
 
 /// Struct that provides the functionality to simulate a game of blackjack using a specific counting strategy.
 /// This struct saves all of the necessary data for reporting/logging the stats of the simulation as well.
+// TODO: implement builder pattern
 pub struct BlackjackGameSim<S: Strategy> {
     table: BlackjackTableSim,
     player: PlayerSim<S>,
@@ -57,6 +58,7 @@ impl<S: Strategy> BlackjackGameSim<S> {
     }
 
     /// Method that runs the blackjack simulation the number of times specified during object creation.
+    // TODO: fix algorithm for making a decsion, should be smoother, no need to have the player object recompute what the valid playing options are...
     fn run(&mut self) -> Result<(), BlackjackGameError> {
         for _i in 0..self.num_hands {
             // Check if player can continue
@@ -116,7 +118,8 @@ impl<S: Strategy> BlackjackGameSim<S> {
         Ok(())
     }
 
-    fn write_stats(&self, destination: Write) -> io::Result<()> {
+    /// Writes the stats the stats currently recorded to the given writer.
+    fn write_stats<D: Write>(&self, destination: D) -> io::Result<()> {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks:".len() + 20;
         const numeric_width: usize = width - text_width;
@@ -129,11 +132,11 @@ impl<S: Strategy> BlackjackGameSim<S> {
         );
         println!(
             "{:<text_width$}{:>numeric_width$}",
-            "total pushes:", self.pushes
+            "total pushes:", self.total_pushes
         );
         println!(
             "{:<text_width$}{:>numeric_width$}",
-            "total losses:", self.losses
+            "total losses:", self.total_losses
         );
         println!(
             "{:<text_width$}{:>numeric_width$}",
@@ -148,6 +151,43 @@ impl<S: Strategy> BlackjackGameSim<S> {
             "{:<text_width$}{:numeric_width$}",
             "number of player blackjacks:", self.number_of_player_blackjacks
         );
+        if self.ended_early {
+            println!(
+                "{:<text_width$}{:>numeric_width$}",
+                "ended early:", self.ended_early
+            )
+        }
         println!("{}", "-".repeat(width));
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_game() {
+        const MIN_BET: u32 = 5;
+        const NUM_HANDS: u32 = 300;
+        let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
+
+        let decision_strategy = BasicStrategy::new();
+        let hilo = HiLo::new(6, MIN_BET, betting_strategy, decision_strategy);
+        let player = PlayerSim::new(500.0, hilo);
+        let table = <BlackjackTableSim as BlackjackTable<
+            PlayerSim<HiLo<MarginBettingStrategy, BasicStrategy>>,
+        >>::new(f32::MAX, 6, 7);
+        let mut game = BlackjackGameSim::new(table, player, NUM_HANDS, MIN_BET);
+
+        if let Err(e) = game.run() {
+            panic!("error occured {e}");
+        }
+
+        if let Err(e) = game.write_stats(std::io::stdout()) {
+            panic!("error occured {e}");
+        }
+
+        assert!(true);
     }
 }
