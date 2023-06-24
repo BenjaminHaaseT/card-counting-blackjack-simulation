@@ -121,7 +121,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
 
         if self.deck.shuffle_flag {
             // For debugging purposes eventually remove this
-            println!("Shuffling...");
+            // println!("Shuffling...");
             self.deck.shuffle(self.n_shuffles);
             player.reset_strategy();
         }
@@ -315,6 +315,7 @@ impl BlackjackTableSim {
     pub fn reset(&mut self) {
         self.final_cards.clear();
         self.dealers_hand.reset();
+        self.num_player_blackjacks = 0;
     }
 
     //TODO: implement surrender functionality eventually

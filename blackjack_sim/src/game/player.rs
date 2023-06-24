@@ -12,7 +12,7 @@ pub struct PlayerSim<S: Strategy> {
     pub bets: Vec<u32>,
     pub bets_log: HashMap<usize, f32>,
     hand_idx: usize,
-    balance: f32,
+    pub balance: f32,
     strategy: S,
 }
 

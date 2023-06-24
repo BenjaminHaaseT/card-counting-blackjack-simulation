@@ -23,12 +23,12 @@ pub struct BlackjackGameSim<S: Strategy> {
     player: PlayerSim<S>,
     min_bet: u32,
     num_hands: u32,
-    total_wins: i32,
-    total_pushes: i32,
-    total_losses: i32,
-    total_winnings: f32,
-    // number_of_player_blackjacks: i32,
-    ended_early: bool,
+    pub total_wins: i32,
+    pub total_pushes: i32,
+    pub total_losses: i32,
+    pub total_winnings: f32,
+    pub num_player_blackjacks: i32,
+    pub ended_early: bool,
 }
 
 impl<S: Strategy> BlackjackGameSim<S> {
@@ -38,7 +38,7 @@ impl<S: Strategy> BlackjackGameSim<S> {
     /// `num_hands` is the number of hands that will be simulated during a single call to `self.run()`,
     /// the simulation will end in max `num_hands` and will only end sooner if the `player` runs out of funds sooner.
     /// `min_bet` decides what the minimum bet should be at the table.
-    fn new(
+    pub fn new(
         table: BlackjackTableSim,
         player: PlayerSim<S>,
         num_hands: u32,
@@ -53,13 +53,13 @@ impl<S: Strategy> BlackjackGameSim<S> {
             total_pushes: 0,
             total_losses: 0,
             total_winnings: 0.0,
-            // number_of_player_blackjacks: 0,
+            num_player_blackjacks: 0,
             ended_early: false,
         }
     }
 
     /// Method that runs the blackjack simulation the number of times specified during object creation.
-    fn run(&mut self) -> Result<(), BlackjackGameError> {
+    pub fn run(&mut self) -> Result<(), BlackjackGameError> {
         for _i in 0..self.num_hands {
             // Check if player can continue
             if !self.player.continue_play(self.min_bet) {
@@ -109,6 +109,8 @@ impl<S: Strategy> BlackjackGameSim<S> {
                 self.total_winnings += winnings;
             }
 
+            self.num_player_blackjacks += self.table.num_player_blackjacks;
+
             // Reset both player and table for another hand
             self.player.reset();
             self.table.reset();
@@ -119,7 +121,7 @@ impl<S: Strategy> BlackjackGameSim<S> {
 
     /// Writes the stats the stats currently recorded to the given writer.
     // TODO: allow an arbitrary writer to be passed in
-    fn write_stats<D: Write>(&self, destination: D) -> io::Result<()> {
+    pub fn display_stats(&self) -> io::Result<()> {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks:".len() + 20;
         const numeric_width: usize = width - text_width;
@@ -159,6 +161,18 @@ impl<S: Strategy> BlackjackGameSim<S> {
 
         Ok(())
     }
+
+    pub fn simulation_reset(&mut self, new_table_balance: f32, new_player_balance: f32) {
+        self.table.balance = new_table_balance;
+        self.player.balance = new_player_balance;
+        self.num_player_blackjacks = 0;
+        self.table.num_player_blackjacks = 0;
+        self.total_wins = 0;
+        self.total_pushes = 0;
+        self.total_losses = 0;
+        self.total_winnings = 0.0;
+        self.ended_early = false;
+    }
 }
 
 #[cfg(test)]
@@ -182,7 +196,7 @@ mod test {
             panic!("error occured {e}");
         }
 
-        if let Err(e) = game.write_stats(std::io::stdout()) {
+        if let Err(e) = game.display_stats() {
             panic!("error occured {e}");
         }
 
