@@ -1,24 +1,34 @@
-use crate::game::strategy::Strategy;
 use crate::game::strategy::TableState;
+use crate::game::strategy::{BettingStrategy, CountingStrategy, DecisionStrategy, Strategy};
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::Rc;
 
 /// Struct for a simulated player
-pub struct PlayerSim<S: Strategy> {
+pub struct PlayerSim<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     hand: Vec<Vec<Rc<Card>>>,
     hand_values: Vec<Vec<u8>>,
     pub bets: Vec<u32>,
     pub bets_log: HashMap<usize, f32>,
     hand_idx: usize,
     pub balance: f32,
-    strategy: S,
+    strategy: Strategy<C, D, B>,
 }
 
-impl<S: Strategy> PlayerSim<S> {
+impl<C, D, B> PlayerSim<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     /// Associated function to create a new `PlayerSim` struct.
-    pub fn new(starting_balance: f32, strategy: S) -> PlayerSim<S> {
+    pub fn new(starting_balance: f32, strategy: Strategy<C, D, B>) -> PlayerSim<C, D, B> {
         PlayerSim {
             hand: vec![vec![]],
             hand_values: vec![vec![]],
@@ -322,7 +332,13 @@ impl<S: Strategy> PlayerSim<S> {
     }
 }
 
-impl<S: Strategy> Player for PlayerSim<S> {}
+impl<C, D, B> Player for PlayerSim<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
+}
 
 // impl<S: Strategy> Display for PlayerSim<S> {
 //     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -350,7 +366,12 @@ impl<S: Strategy> Player for PlayerSim<S> {}
 //     }
 // }
 
-impl<S: Strategy + Display> Display for PlayerSim<S> {
+impl<C, D, B> Display for PlayerSim<C, D, B>
+where
+    C: CountingStrategy + Display,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -377,3 +398,34 @@ impl<S: Strategy + Display> Display for PlayerSim<S> {
         )
     }
 }
+
+// impl<C, D, B> Display for PlayerSim<C, D, B>
+// where
+//     C: CountingStrategy,
+//     D: DecisionStrategy,
+//     B: BettingStrategy,
+// {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(
+//             f,
+//             "{:<21}{:?}\n\
+//                    {:<21}{:?}\n\
+//                    {:<21}{:?}\n\
+//                    {:<21}{:?}\n\
+//                    {:<21}{}\n\
+//                    {:<21}${:.2}\n",
+//             "hand:",
+//             self.hand,
+//             "hand_value:",
+//             self.hand_values,
+//             "bets:",
+//             self.bets,
+//             "bets_log:",
+//             self.bets_log,
+//             "hand_idx:",
+//             self.hand_idx,
+//             "balance:",
+//             self.balance,
+//         )
+//     }
+// }

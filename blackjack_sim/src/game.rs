@@ -7,7 +7,7 @@ pub mod table;
 pub mod prelude {
     pub use super::BlackjackGameSim;
     pub use crate::game::player::PlayerSim;
-    pub use crate::game::strategy::prelude::*;
+    pub use crate::game::strategy;
     pub use crate::game::table::BlackjackTableSim;
     pub use blackjack_lib::{BlackjackGameError, BlackjackTable, Player};
     pub use std::io::{self, Write};
@@ -15,12 +15,20 @@ pub mod prelude {
 }
 
 pub use prelude::*;
+use strategy::Strategy;
+
+use self::strategy::{BettingStrategy, CountingStrategy, DecisionStrategy};
 
 /// Struct that provides the functionality to simulate a game of blackjack using a specific counting strategy.
 /// This struct saves all of the necessary data for reporting/logging the stats of the simulation as well.
-pub struct BlackjackGameSim<S: Strategy> {
+pub struct BlackjackGameSim<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     table: BlackjackTableSim,
-    player: PlayerSim<S>,
+    player: PlayerSim<C, D, B>,
     min_bet: u32,
     num_hands: u32,
     pub total_wins: i32,
@@ -31,7 +39,12 @@ pub struct BlackjackGameSim<S: Strategy> {
     pub ended_early: bool,
 }
 
-impl<S: Strategy> BlackjackGameSim<S> {
+impl<C, D, B> BlackjackGameSim<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     /// Associated method for building a new blackjack game.
     /// `table` is the `BlackjackTableSim` struct that will be used to simulate the blackjack logic,
     /// `player` is the `PlayerSim<S>` struct used to simulate a specific counting strategy during the simulation.
@@ -40,10 +53,10 @@ impl<S: Strategy> BlackjackGameSim<S> {
     /// `min_bet` decides what the minimum bet should be at the table.
     pub fn new(
         table: BlackjackTableSim,
-        player: PlayerSim<S>,
+        player: PlayerSim<C, D, B>,
         num_hands: u32,
         min_bet: u32,
-    ) -> BlackjackGameSim<S> {
+    ) -> BlackjackGameSim<C, D, B> {
         BlackjackGameSim {
             table,
             player,
@@ -178,17 +191,25 @@ impl<S: Strategy> BlackjackGameSim<S> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use strategy::{
+        BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
+        TableState,
+    };
     #[test]
     fn test_game() {
         const MIN_BET: u32 = 5;
         const NUM_HANDS: u32 = 300;
+        const NUM_DECKS: u32 = 6;
         let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
 
-        let decision_strategy = BasicStrategy::new();
-        let hilo = HiLo::new(6, MIN_BET, betting_strategy, decision_strategy);
-        let player = PlayerSim::new(500.0, hilo);
+        let strategy = Strategy::new(NUM_DECKS, MIN_BET)
+            .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
+            .counting_strategy(HiLo::new(NUM_DECKS))
+            .decision_strategy(BasicStrategy::new())
+            .build();
+        let player = PlayerSim::new(500.0, strategy);
         let table = <BlackjackTableSim as BlackjackTable<
-            PlayerSim<HiLo<MarginBettingStrategy, BasicStrategy>>,
+            PlayerSim<HiLo, BasicStrategy, MarginBettingStrategy>,
         >>::new(f32::MAX, 6, 7);
         let mut game = BlackjackGameSim::new(table, player, NUM_HANDS, MIN_BET);
 

@@ -2,6 +2,10 @@ pub mod game;
 
 use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
+use game::strategy::CountingStrategy;
+use strategy::{
+    BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
+};
 
 // type Result<T, E> = Result<T, BlackjackGameError>;
 
@@ -10,9 +14,14 @@ pub use game::prelude::*;
 /// A `BlackjackSimulator` object's main purupose is conveince, it acts as a wrapper for all the other structs needed to run a blackjack simulation to test a specific strategy.
 /// It allows the user of the object to control specific parameters of a typical blackjack game that one would find at a casino,
 /// such as number of decks, the counting strategy, number of shuffles, minimum bet, etc...
-pub struct BlackjackSimulator<S: Strategy> {
+pub struct BlackjackSimulator<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     // strategy: S,
-    game: BlackjackGameSim<S>,
+    game: BlackjackGameSim<C, D, B>,
     player_starting_balance: f32,
     table_starting_balance: f32,
     num_simulations: u32,
@@ -26,11 +35,16 @@ pub struct BlackjackSimulator<S: Strategy> {
     silent: bool,
 }
 
-impl<S: Strategy> BlackjackSimulator<S> {
+impl<C, D, B> BlackjackSimulator<C, D, B>
+where
+    C: CountingStrategy,
+    D: DecisionStrategy,
+    B: BettingStrategy,
+{
     /// Associated function for creating a new blackjack simulation. Takes in the necessary parameters for s
     /// tarting a blackjack Simulation and returns a new `BlackjackSimulator` object.
     pub fn new(
-        strategy: S,
+        strategy: Strategy<C, D, B>,
         player_starting_balance: f32,
         table_starting_balance: f32,
         num_simulations: u32,
@@ -41,7 +55,7 @@ impl<S: Strategy> BlackjackSimulator<S> {
         silent: bool,
     ) -> Self {
         let player = PlayerSim::new(player_starting_balance, strategy);
-        let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
+        let table = <BlackjackTableSim as BlackjackTable<PlayerSim<C, D, B>>>::new(
             table_starting_balance,
             num_decks,
             num_shuffles,
@@ -132,12 +146,21 @@ impl<S: Strategy> BlackjackSimulator<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use strategy::{
+        BasicStrategy, BettingStrategy, CountingStrategy, DecisionStrategy, HiLo,
+        MarginBettingStrategy, Strategy,
+    };
+
     #[test]
     fn simple_simulation_test() {
         const MIN_BET: u32 = 5;
-        let betting_strategy = MarginBettingStrategy::new(4.0, MIN_BET);
-        let decision_strategy = BasicStrategy::new();
-        let strategy = HiLo::new(6, MIN_BET, betting_strategy, decision_strategy);
+        const NUM_DECKS: u32 = 6;
+        let strategy = Strategy::new(NUM_DECKS, MIN_BET)
+            .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
+            .counting_strategy(HiLo::new(NUM_DECKS))
+            .decision_strategy(BasicStrategy::new())
+            .build();
+
         let mut simulator =
             BlackjackSimulator::new(strategy, 500.0, f32::MAX, 30, 6, 7, MIN_BET, 200, false);
 
