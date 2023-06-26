@@ -154,7 +154,7 @@ where
             "total losses:", self.total_losses
         );
         println!(
-            "{:<text_width$}{:>numeric_width$}",
+            "{:<text_width$}{:>numeric_width$.2}",
             "total winnings:", self.total_winnings
         );
         println!(
@@ -164,7 +164,7 @@ where
         );
         println!(
             "{:<text_width$}{:>numeric_width$}",
-            "number of player blackjacks:", self.table.num_player_blackjacks
+            "number of player blackjacks:", self.num_player_blackjacks
         );
         println!(
             "{:<text_width$}{:>numeric_width$}",
@@ -193,7 +193,7 @@ mod test {
     use super::*;
     use strategy::{
         BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
-        TableState,
+        TableState, WongHalves,
     };
     #[test]
     fn test_game() {
@@ -204,7 +204,7 @@ mod test {
 
         let strategy = Strategy::new(NUM_DECKS, MIN_BET)
             .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
-            .counting_strategy(HiLo::new(NUM_DECKS))
+            .counting_strategy(WongHalves::new(NUM_DECKS))
             .decision_strategy(BasicStrategy::new())
             .build();
         let player = PlayerSim::new(500.0, strategy);

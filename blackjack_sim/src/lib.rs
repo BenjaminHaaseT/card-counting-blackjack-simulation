@@ -148,7 +148,7 @@ mod tests {
     use super::*;
     use strategy::{
         BasicStrategy, BettingStrategy, CountingStrategy, DecisionStrategy, HiLo,
-        MarginBettingStrategy, Strategy,
+        MarginBettingStrategy, Strategy, WongHalves,
     };
 
     #[test]
@@ -157,12 +157,12 @@ mod tests {
         const NUM_DECKS: u32 = 6;
         let strategy = Strategy::new(NUM_DECKS, MIN_BET)
             .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
-            .counting_strategy(HiLo::new(NUM_DECKS))
+            .counting_strategy(WongHalves::new(NUM_DECKS))
             .decision_strategy(BasicStrategy::new())
             .build();
 
         let mut simulator =
-            BlackjackSimulator::new(strategy, 500.0, f32::MAX, 30, 6, 7, MIN_BET, 200, false);
+            BlackjackSimulator::new(strategy, 500.0, f32::MAX, 50, 6, 7, MIN_BET, 400, false);
 
         if let Err(e) = simulator.run() {
             panic!("error: {}", e);

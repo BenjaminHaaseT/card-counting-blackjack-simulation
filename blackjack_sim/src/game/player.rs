@@ -123,10 +123,13 @@ where
     }
 
     /// Public method for producing the possible options a player can choose to player their current hand
-    pub fn get_playing_options(&self) -> HashSet<String> {
+    pub fn get_playing_options(&self, dealers_up_card: Rc<Card>) -> HashSet<String> {
         let mut options = HashSet::new();
         options.insert("stand".to_string());
         options.insert("hit".to_string());
+        if self.can_surrender(dealers_up_card) {
+            options.insert("surrender".to_string());
+        }
         if self.can_split() {
             options.insert("split".to_string());
         }
@@ -136,6 +139,8 @@ where
 
         options
     }
+
+    /// Method to check whether or not the player can surrender
 
     /// Returns a boolean, true if the `PlayerSim` instance can split their hand, false otherwise.
     fn can_split(&self) -> bool {
@@ -183,6 +188,13 @@ where
     /// that the current hand at position `self.hand_idx` is now over.
     pub fn stand(&mut self) {
         self.hand_idx += 1;
+    }
+
+    /// Method that implements the logic for surrendering. Will return half the current bet that the player has on the table.
+    pub fn can_surrender(&self, dealers_up_card: Rc<Card>) -> bool {
+        self.hand_idx == 0
+            && self.hand_values[self.hand_idx].len() == 2
+            && (dealers_up_card.val == 1 || dealers_up_card.val == 10)
     }
 
     /// Method to update the state of the players hand when a push occurs.
@@ -245,6 +257,15 @@ where
         }
     }
 
+    /// Method that will execute the logic for surrendering
+    pub fn surrender(&mut self) -> f32 {
+        let bet = self.bets[self.hand_idx] as f32;
+        self.bets[self.hand_idx] = 0;
+        self.balance += bet / 2.0;
+        self.stand();
+        bet / 2.0
+    }
+
     /// Method that implements the logic for doubling down. Will panic if `self.balance` is not high enough to place the bet.
     pub fn double_down(&mut self) {
         assert!(self.bets[self.hand_idx] as f32 <= self.balance);
@@ -295,7 +316,7 @@ where
             .iter()
             .zip(self.hand_values.iter())
             .enumerate()
-            .filter(|(i, (bet, hand))| **bet > 0)
+            .filter(|(_i, (bet, _hand))| **bet > 0)
             .map(|(i, (bet, hand))| (i, *bet, compute_optimal_hand(hand)))
             .collect::<Vec<(usize, u32, u8)>>();
         if !res.is_empty() {
@@ -307,7 +328,7 @@ where
 
     /// Method for returning a valid option given the state of the table
     pub fn decide_option(&self, dealers_up_card: Rc<Card>) -> Result<String, BlackjackGameError> {
-        let options = self.get_playing_options();
+        let options = self.get_playing_options(dealers_up_card.clone());
         let current_state = self.strategy.get_current_table_state(
             &self.hand[self.hand_idx],
             &self.hand_values[self.hand_idx],

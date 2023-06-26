@@ -329,12 +329,14 @@ impl BlackjackTableSim {
     }
 
     //TODO: implement surrender functionality eventually
-    pub fn surrender<C, D, B>(&self, player: &mut PlayerSim<C, D, B>)
+    pub fn surrender<C, D, B>(&mut self, player: &mut PlayerSim<C, D, B>)
     where
         C: CountingStrategy,
         D: DecisionStrategy,
         B: BettingStrategy,
     {
+        let surrender_amount = player.surrender();
+        self.balance += surrender_amount;
     }
 }
 
@@ -376,7 +378,7 @@ fn test_single_hand() {
     }
 
     // Get the options from the player
-    let options = player.get_playing_options();
+    let options = player.get_playing_options(table.dealers_face_up_card());
 
     println!("playing options = {:?}", options);
 
@@ -449,7 +451,7 @@ fn test_single_hand_loop() {
         }
 
         // Get options
-        let options = player.get_playing_options();
+        let options = player.get_playing_options(table.dealers_face_up_card());
         println!("options: {:?}", options);
 
         let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
@@ -491,52 +493,6 @@ fn test_single_hand_loop() {
     println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
 
     println!("bets_log: {:?}", table.hand_log);
-    // // Display player
-    // println!("{}", player);
-    // println!();
-
-    // table.deal_hand(&mut player);
-
-    // println!("{}", player);
-    // println!();
-
-    // println!("dealers_hand: {:?}", table.dealers_hand.hand);
-    // println!("dealers_hand_value: {:?}", table.dealers_hand.hand_value);
-    // println!();
-
-    // if player.turn_is_over() || !player.continue_play(5) {
-    //     println!("ended early, either player or dealer has blackjack");
-    //     return;
-    // }
-
-    // // Get options
-    // let options = player.get_playing_options();
-    // println!("options: {:?}", options);
-
-    // let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
-
-    // let decision = match decision_result {
-    //     Ok(d) => {
-    //         println!("chosen option: {d}");
-    //         d
-    //     }
-    //     Err(e) => {
-    //         eprintln!("error: {e}");
-    //         return ();
-    //     }
-    // };
-
-    // println!();
-
-    // if let Err(e) = table.play_option(&mut player, options, decision) {
-    //     eprintln!("error: {e}");
-    //     return ();
-    // }
-
-    // // Display player again for debugging
-    // println!("{}", player);
-
-    // println!();
 
     assert!(true);
 }

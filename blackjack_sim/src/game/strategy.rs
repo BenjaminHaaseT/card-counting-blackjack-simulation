@@ -19,7 +19,7 @@ pub struct TableState<'a> {
     hand_value: &'a Vec<u8>,
     bet: u32,
     balance: f32,
-    running_count: i32,
+    running_count: f32,
     true_count: f32,
     dealers_up_card: Rc<Card>,
 }
@@ -30,7 +30,7 @@ impl<'a> TableState<'a> {
         hand_value: &'a Vec<u8>,
         bet: u32,
         balance: f32,
-        running_count: i32,
+        running_count: f32,
         true_count: f32,
         dealers_up_card: Rc<Card>,
     ) -> TableState<'a> {
@@ -51,6 +51,9 @@ impl<'a> TableState<'a> {
 /// Allows for composibility and customizability for specific card counting strategies.
 /// The implementer may implement a custom decision strategy based on the state of the table
 pub trait DecisionStrategy {
+    /// Method that takes `self` by reference, `decision_state` representing the state of the table and the count,
+    /// and `options` a `HashSet<String>` representing the valid options to a player may choose to play their current hand.
+    /// This method returns a string representing the most optimal way to play the current hand given its inputs
     fn decide_option<'a>(
         &self,
         decision_state: TableState<'a>,
@@ -60,7 +63,7 @@ pub trait DecisionStrategy {
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
 pub trait BettingStrategy {
-    fn bet(&self, running_count: i32, true_count: f32, balance: f32) -> u32;
+    fn bet(&self, running_count: f32, true_count: f32, balance: f32) -> u32;
 }
 
 /// Trait for a specific counting srategy. Can be implemented by any object that can be used to implement a counting strategy
@@ -76,7 +79,7 @@ pub trait CountingStrategy {
         dealers_up_card: Rc<Card>,
     ) -> TableState<'a>;
     fn reset(&mut self);
-    fn running_count(&self) -> i32;
+    fn running_count(&self) -> f32;
     fn true_count(&self) -> f32;
 }
 
@@ -96,7 +99,7 @@ impl MarginBettingStrategy {
 
 impl BettingStrategy for MarginBettingStrategy {
     /// Returns the bet based on the true count, if the true count is greater than zero the product of the true count minimum bet and the margin is returned
-    fn bet(&self, running_count: i32, true_count: f32, balance: f32) -> u32 {
+    fn bet(&self, running_count: f32, true_count: f32, balance: f32) -> u32 {
         if true_count > 0.0 {
             let scalar = f32::ceil(true_count);
             u32::min(
@@ -319,147 +322,12 @@ impl DecisionStrategy for BasicStrategy {
     }
 }
 
-// /// Struct that implements a simple HiLo betting strategy
-// pub struct HiLo<B: BettingStrategy, D: DecisionStrategy> {
-//     running_count: i32,
-//     true_count: f32,
-//     total_cards_counted: u32,
-//     n_decks: u32,
-//     betting_strategy: B,
-//     decision_strategy: D,
-//     lookup_table: HashMap<u8, i32>,
-// }
-
-// // TODO: Implement builder pattern for HiLo strategy.
-// impl<B: BettingStrategy, D: DecisionStrategy> HiLo<B, D> {
-//     /// Associated method for creating a new HiLo struct
-//     pub fn new(n_decks: u32, min_bet: u32, betting_strategy: B, decision_strategy: D) -> Self {
-//         // Initialize lookup table
-//         let mut lookup_table = HashMap::new();
-//         for i in 2..7 {
-//             lookup_table.insert(i, 1);
-//         }
-//         for i in 7..10 {
-//             lookup_table.insert(i, 0);
-//         }
-//         lookup_table.insert(1, -1);
-//         lookup_table.insert(10, -1);
-
-//         HiLo {
-//             running_count: 0,
-//             true_count: 0.0,
-//             total_cards_counted: 0,
-//             n_decks,
-//             betting_strategy,
-//             decision_strategy,
-//             lookup_table,
-//         }
-//     }
-// }
-
-// impl<B: BettingStrategy, D: DecisionStrategy> Strategy for HiLo<B, D> {
-//     /// Method updates the running count and the true count respectively
-//     fn update(&mut self, card: Rc<Card>) {
-//         let card_val = card.val;
-//         self.running_count += self.lookup_table[&card_val];
-//         self.total_cards_counted += 1;
-//         let remaining_decks = (self.n_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
-//         self.true_count = (self.running_count as f32) / remaining_decks;
-//     }
-
-//     /// Method that returns a bet according to `decision_state`
-//     fn bet<'a>(&self, balance: f32) -> u32 {
-//         self.betting_strategy
-//             .bet(self.running_count, self.true_count, balance)
-//     }
-
-//     /// Method for making a decision with regards to playing a hand.
-//     /// The method is potentiall fallible so it returns a `Result<String, BlackjackGameError>` representing whether or not a valid option was chosen or not
-//     fn decide_option<'a>(
-//         &self,
-//         decision_state: TableState<'a>,
-//         options: HashSet<String>,
-//     ) -> Result<String, BlackjackGameError> {
-//         self.decision_strategy
-//             .decide_option(decision_state, options)
-//     }
-
-//     /// Method for getting the current state of the table
-//     fn get_current_table_state<'a>(
-//         &self,
-//         hand: &'a Vec<Rc<Card>>,
-//         hand_value: &'a Vec<u8>,
-//         bet: u32,
-//         balance: f32,
-//         dealers_up_card: Rc<Card>,
-//     ) -> TableState<'a> {
-//         TableState::new(
-//             hand,
-//             hand_value,
-//             bet,
-//             balance,
-//             self.running_count,
-//             self.true_count,
-//             dealers_up_card,
-//         )
-//     }
-
-//     /// Method for reseting the count of the current strategy. A counting strategy needs to be reset whenenver the deck gets shuffled again,
-//     /// this method provides that functionality.
-//     fn reset(&mut self) {
-//         self.running_count = 0;
-//         self.true_count = 0.0;
-//         self.total_cards_counted = 0;
-//     }
-// }
-
-// impl<B: BettingStrategy, D: DecisionStrategy> Display for HiLo<B, D> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(
-//             f,
-//             "{}",
-//             format!(
-//                 "{:<21}:{}\n{:<21}:{}\n{:<21}:{}",
-//                 "running_count:",
-//                 self.running_count,
-//                 "true_count:",
-//                 self.true_count,
-//                 "total_cards_counted:",
-//                 self.total_cards_counted,
-//             )
-//         )
-//     }
-// }
-
 pub struct HiLo {
     running_count: i32,
     true_count: f32,
     num_decks: u32,
     total_cards_counted: i32,
     lookup_table: HashMap<u8, i32>,
-}
-
-impl HiLo {
-    // pub fn new(num_decks: u32) -> Self {
-    //     // Initialize lookup table
-    //     let mut lookup_table = HashMap::new();
-    //     for i in 2..7 {
-    //         lookup_table.insert(i, 1);
-    //     }
-    //     for i in 7..10 {
-    //         lookup_table.insert(i, 0);
-    //     }
-    //     lookup_table.insert(1, -1);
-    //     lookup_table.insert(10, -1);
-
-    //     HiLo {
-    //         running_count: 0,
-    //         true_count: 0.0,
-    //         num_decks,
-    //         total_cards_counted: 0,
-    //         lookup_table,
-    //     }
-    // }
 }
 
 impl CountingStrategy for HiLo {
@@ -484,6 +352,7 @@ impl CountingStrategy for HiLo {
             lookup_table,
         }
     }
+
     fn update(&mut self, card: Rc<Card>) {
         self.running_count += self.lookup_table[&card.val];
         self.total_cards_counted += 1;
@@ -505,14 +374,14 @@ impl CountingStrategy for HiLo {
             hand_value,
             bet,
             balance,
-            running_count: self.running_count,
+            running_count: self.running_count as f32,
             true_count: self.true_count,
             dealers_up_card,
         }
     }
 
-    fn running_count(&self) -> i32 {
-        self.running_count
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
     }
 
     fn true_count(&self) -> f32 {
@@ -543,6 +412,80 @@ impl Display for HiLo {
     }
 }
 
+/// A struct that implements the famous Wong Halves card counting strategy.
+pub struct WongHalves {
+    running_count: f32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, f32>,
+}
+
+impl CountingStrategy for WongHalves {
+    fn new(num_decks: u32) -> Self {
+        // Build lookup table with card values counted according to Wong Halves counting strategy.
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(1, -1.0);
+        lookup_table.insert(10, -1.0);
+        lookup_table.insert(2, 0.5);
+        lookup_table.insert(7, 0.5);
+        lookup_table.insert(3, 1.0);
+        lookup_table.insert(4, 1.0);
+        lookup_table.insert(6, 1.0);
+        lookup_table.insert(5, 1.5);
+        lookup_table.insert(8, 0.0);
+        lookup_table.insert(9, -0.5);
+
+        WongHalves {
+            running_count: 0.0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Rc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Rc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count,
+            true_count: self.true_count,
+            dealers_up_card,
+        }
+    }
+
+    fn update(&mut self, card: Rc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks_counted =
+            (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = self.running_count / estimated_decks_counted;
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0.0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+}
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.
 pub struct Strategy<C, D, B>
 where
@@ -573,7 +516,7 @@ where
 
     pub fn bet(&self, balance: f32) -> u32 {
         self.betting_strategy.bet(
-            self.counting_strategy.running_count(),
+            self.counting_strategy.running_count() as f32,
             self.counting_strategy.true_count(),
             balance,
         )
@@ -608,7 +551,7 @@ where
             hand_value,
             bet,
             balance,
-            running_count: self.counting_strategy.running_count(),
+            running_count: self.counting_strategy.running_count() as f32,
             true_count: self.counting_strategy.true_count(),
             dealers_up_card,
         }
