@@ -3,32 +3,22 @@ use crate::game::strategy::{BettingStrategy, CountingStrategy, DecisionStrategy,
 use blackjack_lib::{compute_optimal_hand, BlackjackGameError, Card, Player};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::Arc;
 
 /// Struct for a simulated player
-pub struct PlayerSim<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
-    hand: Vec<Vec<Rc<Card>>>,
+pub struct PlayerSim<S: Strategy> {
+    hand: Vec<Vec<Arc<Card>>>,
     hand_values: Vec<Vec<u8>>,
     pub bets: Vec<u32>,
     pub bets_log: HashMap<usize, f32>,
     hand_idx: usize,
     pub balance: f32,
-    strategy: Strategy<C, D, B>,
+    strategy: S,
 }
 
-impl<C, D, B> PlayerSim<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
+impl<S: Strategy> PlayerSim<S> {
     /// Associated function to create a new `PlayerSim` struct.
-    pub fn new(starting_balance: f32, strategy: Strategy<C, D, B>) -> PlayerSim<C, D, B> {
+    pub fn new(starting_balance: f32, strategy: S) -> PlayerSim<S> {
         PlayerSim {
             hand: vec![vec![]],
             hand_values: vec![vec![]],
@@ -78,9 +68,9 @@ where
     }
 
     /// Method to receive a card, updates the state of the `Player`
-    pub fn receive_card(&mut self, card: Rc<Card>) {
+    pub fn receive_card(&mut self, card: Arc<Card>) {
         // Push new card onto current hand
-        self.hand[self.hand_idx].push(Rc::clone(&card));
+        self.hand[self.hand_idx].push(Arc::clone(&card));
 
         // Update the value of the current hand
         let card_val = card.val;
@@ -123,7 +113,7 @@ where
     }
 
     /// Public method for producing the possible options a player can choose to player their current hand
-    pub fn get_playing_options(&self, dealers_up_card: Rc<Card>) -> HashSet<String> {
+    pub fn get_playing_options(&self, dealers_up_card: Arc<Card>) -> HashSet<String> {
         let mut options = HashSet::new();
         options.insert("stand".to_string());
         options.insert("hit".to_string());
@@ -178,9 +168,9 @@ where
     }
 
     /// Method that acts as a wrapper for accessing the `PlayerSim` struct instances `strategy`.
-    pub fn update_strategy<'a, I: IntoIterator<Item = &'a Rc<Card>>>(&mut self, cards: I) {
+    pub fn update_strategy<'a, I: IntoIterator<Item = &'a Arc<Card>>>(&mut self, cards: I) {
         for card in cards {
-            self.strategy.update(Rc::clone(card));
+            self.strategy.update(Arc::clone(card));
         }
     }
 
@@ -191,7 +181,7 @@ where
     }
 
     /// Method that implements the logic for surrendering. Will return half the current bet that the player has on the table.
-    pub fn can_surrender(&self, dealers_up_card: Rc<Card>) -> bool {
+    pub fn can_surrender(&self, dealers_up_card: Arc<Card>) -> bool {
         self.hand_idx == 0
             && self.hand_values[self.hand_idx].len() == 2
             && (dealers_up_card.val == 1 || dealers_up_card.val == 10)
@@ -275,7 +265,7 @@ where
 
     /// Method that implements the logic for splitting.
     /// Will panic if `self.balance` is not high enough to place the bet or if the current hand is empty().
-    pub fn split(&mut self, card1: Rc<Card>, card2: Rc<Card>) {
+    pub fn split(&mut self, card1: Arc<Card>, card2: Arc<Card>) {
         assert!(self.bets[self.hand_idx] as f32 <= self.balance);
         // Get current bet and duplicate it for the new hand
         let cur_bet = self.bets[self.hand_idx];
@@ -327,7 +317,7 @@ where
     }
 
     /// Method for returning a valid option given the state of the table
-    pub fn decide_option(&self, dealers_up_card: Rc<Card>) -> Result<String, BlackjackGameError> {
+    pub fn decide_option(&self, dealers_up_card: Arc<Card>) -> Result<String, BlackjackGameError> {
         let options = self.get_playing_options(dealers_up_card.clone());
         let current_state = self.strategy.get_current_table_state(
             &self.hand[self.hand_idx],
@@ -353,46 +343,9 @@ where
     }
 }
 
-impl<C, D, B> Player for PlayerSim<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
-}
+impl<S: Strategy> Player for PlayerSim<S> {}
 
-// impl<S: Strategy> Display for PlayerSim<S> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(
-//             f,
-//             "{:<14}{:?}\n\
-//                    {:<14}{:?}\n\
-//                    {:<14}{:?}\n\
-//                    {:<14}{:?}\n\
-//                    {:<14}{}\n\
-//                    {:<14}${:.2}\n",
-//             "hand:",
-//             self.hand,
-//             "hand_value:",
-//             self.hand_values,
-//             "bets:",
-//             self.bets,
-//             "bets_log:",
-//             self.bets_log,
-//             "hand_idx:",
-//             self.hand_idx,
-//             "balance:",
-//             self.balance
-//         )
-//     }
-// }
-
-impl<C, D, B> Display for PlayerSim<C, D, B>
-where
-    C: CountingStrategy + Display,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
+impl<S: Strategy + Display> Display for PlayerSim<S> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -419,34 +372,3 @@ where
         )
     }
 }
-
-// impl<C, D, B> Display for PlayerSim<C, D, B>
-// where
-//     C: CountingStrategy,
-//     D: DecisionStrategy,
-//     B: BettingStrategy,
-// {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(
-//             f,
-//             "{:<21}{:?}\n\
-//                    {:<21}{:?}\n\
-//                    {:<21}{:?}\n\
-//                    {:<21}{:?}\n\
-//                    {:<21}{}\n\
-//                    {:<21}${:.2}\n",
-//             "hand:",
-//             self.hand,
-//             "hand_value:",
-//             self.hand_values,
-//             "bets:",
-//             self.bets,
-//             "bets_log:",
-//             self.bets_log,
-//             "hand_idx:",
-//             self.hand_idx,
-//             "balance:",
-//             self.balance,
-//         )
-//     }
-// }

@@ -9,26 +9,92 @@ pub mod prelude {
     pub use crate::game::player::PlayerSim;
     pub use crate::game::strategy;
     pub use crate::game::table::BlackjackTableSim;
-    pub use blackjack_lib::{BlackjackGameError, BlackjackTable, Player};
+    pub use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Player, RANKS, SUITS};
     pub use std::io::{self, Write};
     // pub use BlackjackGameSim;
 }
 
 pub use prelude::*;
+use rand::{self, Rng};
+use std::sync::Arc;
 use strategy::Strategy;
 
 use self::strategy::{BettingStrategy, CountingStrategy, DecisionStrategy};
 
+/// A struct to implement a thread safe deck of cards
+pub struct DeckSim {
+    cards: Vec<Arc<Card>>,
+    n_decks: usize,
+    deck_pos: usize,
+    shuffle_flag_pos: usize,
+    pub shuffle_flag: bool,
+}
+
+/// A struct to represent a deck of cards, is basically a collection of card structs that implements some specific logic related to a game of blackjack
+impl DeckSim {
+    /// An associated function that aids in the building of a deck of cards
+    fn build_card_deck(n_decks: usize) -> Vec<Arc<Card>> {
+        let mut cards = Vec::with_capacity(n_decks * 52);
+        for _i in 0..n_decks {
+            for suit in SUITS {
+                for rank in RANKS {
+                    cards.push(Arc::new(Card::new(suit, rank)));
+                }
+            }
+        }
+        cards
+    }
+
+    /// Creates and returns a new Deck struct
+    pub fn new(n_decks: usize) -> DeckSim {
+        assert!(n_decks > 0, "Cannot have a deck with zero cards");
+        let cards = Self::build_card_deck(n_decks);
+        let n_cards = cards.len();
+        let shuffle_flag_pos = f32::floor(((n_cards - 1) as f32) * 0.8) as usize;
+
+        DeckSim {
+            cards,
+            n_decks,
+            deck_pos: 0,
+            shuffle_flag_pos,
+            shuffle_flag: true,
+        }
+    }
+
+    /// Shuffles the deck of cards to simulate the random behavior of a shuffled deck of cards
+    pub fn shuffle(&mut self, n_shuffles: u32) {
+        assert!(n_shuffles > 0);
+        let mut rng = rand::thread_rng();
+        for _i in 0..n_shuffles {
+            for j in 0..self.cards.len() {
+                let random_idx = rng.gen_range(0..self.cards.len());
+                self.cards.swap(j, random_idx);
+            }
+        }
+        self.deck_pos = 0;
+        self.shuffle_flag = false;
+    }
+
+    /// Returns the next card, i.e. the card that is at the top of the deck of cards
+    pub fn get_next_card(&mut self) -> Option<Arc<Card>> {
+        if self.deck_pos < self.cards.len() {
+            let next_card = Some(Arc::clone(&self.cards[self.deck_pos]));
+            self.deck_pos += 1;
+            if self.deck_pos == self.shuffle_flag_pos {
+                self.shuffle_flag = true;
+            }
+            return next_card;
+        }
+
+        None
+    }
+}
+
 /// Struct that provides the functionality to simulate a game of blackjack using a specific counting strategy.
 /// This struct saves all of the necessary data for reporting/logging the stats of the simulation as well.
-pub struct BlackjackGameSim<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
+pub struct BlackjackGameSim<S: Strategy> {
     table: BlackjackTableSim,
-    player: PlayerSim<C, D, B>,
+    player: PlayerSim<S>,
     min_bet: u32,
     num_hands: u32,
     pub total_wins: i32,
@@ -39,12 +105,7 @@ where
     pub ended_early: bool,
 }
 
-impl<C, D, B> BlackjackGameSim<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
+impl<S: Strategy> BlackjackGameSim<S> {
     /// Associated method for building a new blackjack game.
     /// `table` is the `BlackjackTableSim` struct that will be used to simulate the blackjack logic,
     /// `player` is the `PlayerSim<S>` struct used to simulate a specific counting strategy during the simulation.
@@ -53,10 +114,10 @@ where
     /// `min_bet` decides what the minimum bet should be at the table.
     pub fn new(
         table: BlackjackTableSim,
-        player: PlayerSim<C, D, B>,
+        player: PlayerSim<S>,
         num_hands: u32,
         min_bet: u32,
-    ) -> BlackjackGameSim<C, D, B> {
+    ) -> BlackjackGameSim<S> {
         BlackjackGameSim {
             table,
             player,
@@ -134,7 +195,7 @@ where
 
     /// Writes the stats the stats currently recorded to the given writer.
     // TODO: allow an arbitrary writer to be passed in
-    pub fn display_stats(&self) -> io::Result<()> {
+    pub fn display_stats(&self) {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks:".len() + 20;
         const numeric_width: usize = width - text_width;
@@ -171,11 +232,9 @@ where
             "ended early:", self.ended_early
         );
         println!("{}", "-".repeat(width));
-
-        Ok(())
     }
 
-    pub fn simulation_reset(&mut self, new_table_balance: f32, new_player_balance: f32) {
+    pub fn reset(&mut self, new_table_balance: f32, new_player_balance: f32) {
         self.table.balance = new_table_balance;
         self.player.balance = new_player_balance;
         self.num_player_blackjacks = 0;
@@ -192,24 +251,21 @@ where
 mod test {
     use super::*;
     use strategy::{
-        BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
-        TableState, WongHalves,
+        BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy,
+        PlayerStrategy, Strategy, TableState, WongHalves,
     };
     #[test]
     fn test_game() {
         const MIN_BET: u32 = 5;
         const NUM_HANDS: u32 = 300;
         const NUM_DECKS: u32 = 6;
+        let counting_strategy = HiLo::new(NUM_DECKS);
+        let decision_strategy = BasicStrategy::new();
         let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
-
-        let strategy = Strategy::new(NUM_DECKS, MIN_BET)
-            .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
-            .counting_strategy(WongHalves::new(NUM_DECKS))
-            .decision_strategy(BasicStrategy::new())
-            .build();
+        let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
         let player = PlayerSim::new(500.0, strategy);
         let table = <BlackjackTableSim as BlackjackTable<
-            PlayerSim<HiLo, BasicStrategy, MarginBettingStrategy>,
+            PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
         >>::new(f32::MAX, 6, 7);
         let mut game = BlackjackGameSim::new(table, player, NUM_HANDS, MIN_BET);
 
@@ -217,9 +273,7 @@ mod test {
             panic!("error occured {e}");
         }
 
-        if let Err(e) = game.display_stats() {
-            panic!("error occured {e}");
-        }
+        game.display_stats();
 
         assert!(true);
     }

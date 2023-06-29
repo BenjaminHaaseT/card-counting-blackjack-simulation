@@ -1,8 +1,9 @@
 // use crate::sim::game::player::PlayerSimState;
 // use crate::sim::game::table::TableState;
+use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub mod prelude {
     pub use super::*;
@@ -15,24 +16,26 @@ pub use prelude::*;
 /// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and or place a bet.
 /// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`.
 pub struct TableState<'a> {
-    hand: &'a Vec<Rc<Card>>,
+    hand: &'a Vec<Arc<Card>>,
     hand_value: &'a Vec<u8>,
     bet: u32,
     balance: f32,
     running_count: f32,
     true_count: f32,
-    dealers_up_card: Rc<Card>,
+    num_decks: u32,
+    dealers_up_card: Arc<Card>,
 }
 
 impl<'a> TableState<'a> {
     fn new(
-        hand: &'a Vec<Rc<Card>>,
+        hand: &'a Vec<Arc<Card>>,
         hand_value: &'a Vec<u8>,
         bet: u32,
         balance: f32,
         running_count: f32,
         true_count: f32,
-        dealers_up_card: Rc<Card>,
+        num_decks: u32,
+        dealers_up_card: Arc<Card>,
     ) -> TableState<'a> {
         TableState {
             hand,
@@ -41,6 +44,7 @@ impl<'a> TableState<'a> {
             balance,
             running_count,
             true_count,
+            num_decks,
             dealers_up_card,
         }
     }
@@ -69,14 +73,14 @@ pub trait BettingStrategy {
 /// Trait for a specific counting srategy. Can be implemented by any object that can be used to implement a counting strategy
 pub trait CountingStrategy {
     fn new(num_decks: u32) -> Self;
-    fn update(&mut self, card: Rc<Card>);
+    fn update(&mut self, card: Arc<Card>);
     fn get_current_table_state<'a>(
         &self,
-        hand: &'a Vec<Rc<Card>>,
+        hand: &'a Vec<Arc<Card>>,
         hand_value: &'a Vec<u8>,
         bet: u32,
         balance: f32,
-        dealers_up_card: Rc<Card>,
+        dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
     fn reset(&mut self);
     fn running_count(&self) -> f32;
@@ -353,7 +357,7 @@ impl CountingStrategy for HiLo {
         }
     }
 
-    fn update(&mut self, card: Rc<Card>) {
+    fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
         self.total_cards_counted += 1;
         let estimated_decks_counted =
@@ -363,11 +367,11 @@ impl CountingStrategy for HiLo {
 
     fn get_current_table_state<'a>(
         &self,
-        hand: &'a Vec<Rc<Card>>,
+        hand: &'a Vec<Arc<Card>>,
         hand_value: &'a Vec<u8>,
         bet: u32,
         balance: f32,
-        dealers_up_card: Rc<Card>,
+        dealers_up_card: Arc<Card>,
     ) -> TableState<'a> {
         TableState {
             hand,
@@ -376,6 +380,7 @@ impl CountingStrategy for HiLo {
             balance,
             running_count: self.running_count as f32,
             true_count: self.true_count,
+            num_decks: self.num_decks,
             dealers_up_card,
         }
     }
@@ -447,11 +452,11 @@ impl CountingStrategy for WongHalves {
 
     fn get_current_table_state<'a>(
         &self,
-        hand: &'a Vec<Rc<Card>>,
+        hand: &'a Vec<Arc<Card>>,
         hand_value: &'a Vec<u8>,
         bet: u32,
         balance: f32,
-        dealers_up_card: Rc<Card>,
+        dealers_up_card: Arc<Card>,
     ) -> TableState<'a> {
         TableState {
             hand,
@@ -460,11 +465,12 @@ impl CountingStrategy for WongHalves {
             balance,
             running_count: self.running_count,
             true_count: self.true_count,
+            num_decks: self.num_decks,
             dealers_up_card,
         }
     }
 
-    fn update(&mut self, card: Rc<Card>) {
+    fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
         self.total_cards_counted += 1;
         let estimated_decks_counted =
@@ -486,8 +492,78 @@ impl CountingStrategy for WongHalves {
         self.true_count
     }
 }
+
+/// Struct that implements the popular Knockout card counting strategy. No need to compute a true count.
+pub struct KO {
+    running_count: i32,
+    num_decks: u32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for KO {
+    /// Associated method to build a new KO struct
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 2u8..=7 {
+            lookup_table.insert(i, 1);
+        }
+        lookup_table.insert(8, 0);
+        lookup_table.insert(9, 0);
+        lookup_table.insert(1, -1);
+        lookup_table.insert(10, -1);
+        let running_count = 4 - 4 * (num_decks as i32);
+
+        KO {
+            running_count,
+            num_decks,
+            lookup_table,
+        }
+    }
+
+    /// Update the count for the strategy. Since there is no need to compute true count, we only need to update the running count.
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+    }
+
+    /// Getter for the true count. Since the true count and running count are the same we only need to return the running count.
+    fn true_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    /// Getter for the running count.
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    /// Method that takes data about the current state of the table and returns a `TableState` object that holds all relevant information for a player to make a decision
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.running_count as f32,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    /// Reset the counting strategy. We only need to reset the running count to 4 - total number of decks * 4.
+    fn reset(&mut self) {
+        self.running_count = 4 - (self.num_decks as i32) * 4;
+    }
+}
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.
-pub struct Strategy<C, D, B>
+#[derive(Debug)]
+pub struct PlayerStrategy<C, D, B>
 where
     C: CountingStrategy,
     D: DecisionStrategy,
@@ -498,67 +574,22 @@ where
     betting_strategy: B,
 }
 
-impl<C, D, B> Strategy<C, D, B>
+impl<C, D, B> PlayerStrategy<C, D, B>
 where
     C: CountingStrategy,
     D: DecisionStrategy,
     B: BettingStrategy,
 {
-    pub fn new(num_decks: u32, min_bet: u32) -> StrategyBuilder<C, D, B> {
-        StrategyBuilder {
-            num_decks,
-            min_bet,
-            counting_strategy: None,
-            decision_strategy: None,
-            betting_strategy: None,
-        }
-    }
-
-    pub fn bet(&self, balance: f32) -> u32 {
-        self.betting_strategy.bet(
-            self.counting_strategy.running_count() as f32,
-            self.counting_strategy.true_count(),
-            balance,
-        )
-    }
-
-    pub fn decide_option<'a>(
-        &self,
-        current_state: TableState<'a>,
-        options: HashSet<String>,
-    ) -> Result<String, BlackjackGameError> {
-        self.decision_strategy.decide_option(current_state, options)
-    }
-
-    pub fn reset(&mut self) {
-        self.counting_strategy.reset();
-    }
-
-    pub fn update(&mut self, card: Rc<Card>) {
-        self.counting_strategy.update(card);
-    }
-
-    pub fn get_current_table_state<'a>(
-        &self,
-        hand: &'a Vec<Rc<Card>>,
-        hand_value: &'a Vec<u8>,
-        bet: u32,
-        balance: f32,
-        dealers_up_card: Rc<Card>,
-    ) -> TableState<'a> {
-        TableState {
-            hand,
-            hand_value,
-            bet,
-            balance,
-            running_count: self.counting_strategy.running_count() as f32,
-            true_count: self.counting_strategy.true_count(),
-            dealers_up_card,
+    pub fn new(counting_strategy: C, decision_strategy: D, betting_strategy: B) -> Self {
+        PlayerStrategy {
+            counting_strategy,
+            decision_strategy,
+            betting_strategy,
         }
     }
 }
 
-impl<C, D, B> Display for Strategy<C, D, B>
+impl<C, D, B> Display for PlayerStrategy<C, D, B>
 where
     C: CountingStrategy + Display,
     D: DecisionStrategy,
@@ -569,63 +600,97 @@ where
     }
 }
 
-/// A struct that aids in building a customized strategy
-pub struct StrategyBuilder<C, D, B>
+impl<C, D, B> Strategy for PlayerStrategy<C, D, B>
 where
     C: CountingStrategy,
     D: DecisionStrategy,
     B: BettingStrategy,
 {
-    num_decks: u32,
-    min_bet: u32,
-    counting_strategy: Option<C>,
-    decision_strategy: Option<D>,
-    betting_strategy: Option<B>,
+    fn bet(&self, balance: f32) -> u32 {
+        self.betting_strategy.bet(
+            self.counting_strategy.running_count() as f32,
+            self.counting_strategy.true_count(),
+            balance,
+        )
+    }
+
+    fn decide_option<'a>(
+        &self,
+        current_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError> {
+        self.decision_strategy.decide_option(current_state, options)
+    }
+
+    fn reset(&mut self) {
+        self.counting_strategy.reset();
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.counting_strategy.update(card);
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        self.counting_strategy.get_current_table_state(
+            hand,
+            hand_value,
+            bet,
+            balance,
+            dealers_up_card,
+        )
+    }
 }
 
-impl<C, D, B> StrategyBuilder<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
-    /// Method that sets `self.counting_strategy` of a `StrategyBuilder` object.
-    pub fn counting_strategy(&mut self, counter: C) -> &mut Self {
-        self.counting_strategy = Some(counter);
-        self
-    }
+/// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
+pub trait Strategy {
+    // fn new() -> Self;
+    fn bet(&self, balance: f32) -> u32;
+    fn decide_option<'a>(
+        &self,
+        current_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError>;
+    fn reset(&mut self);
+    fn update(&mut self, card: Arc<Card>);
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a>;
+}
 
-    /// Method that sets `self.decision_strategy` of a `StrategyBuilder` object.
-    pub fn decision_strategy(&mut self, decider: D) -> &mut Self {
-        self.decision_strategy = Some(decider);
-        self
-    }
+#[cfg(test)]
+mod test {
+    use super::*;
 
-    /// Method that sets `self.betting_strategy` of a `StrategyBuilder` object.
-    pub fn betting_strategy(&mut self, better: B) -> &mut Self {
-        self.betting_strategy = Some(better);
-        self
-    }
+    #[test]
+    fn test_dynamic_strategy_creation() {
+        let mut strategies: Vec<Box<dyn Strategy>> = vec![];
+        let dyn_strategy1: Box<dyn Strategy> = Box::new(PlayerStrategy::new(
+            HiLo::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ));
 
-    /// Method that builds a `Strategy` object. Will supply counting_strategy, decision_strategy and bettting strategy with
-    /// `HiLo`, `BasicStrategy` and `MarginBettingStrategy` respectively by default if these fields have not been set.
-    pub fn build(&mut self) -> Strategy<C, D, B> {
-        let counting_strategy = self
-            .counting_strategy
-            .take()
-            .expect("counting strategy should be set");
-        let decision_strategy = self
-            .decision_strategy
-            .take()
-            .expect("decision strategy should have been set");
-        let betting_strategy = self
-            .betting_strategy
-            .take()
-            .expect("betting strategy should have been set");
-        Strategy {
-            counting_strategy,
-            decision_strategy,
-            betting_strategy,
-        }
+        let dyn_strategy2: Box<dyn Strategy> = Box::new(PlayerStrategy::new(
+            WongHalves::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ));
+
+        strategies.push(dyn_strategy1);
+        strategies.push(dyn_strategy2);
+        // println!("{:#?}", strategies);
+        assert!(true);
     }
 }

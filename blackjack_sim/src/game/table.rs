@@ -1,14 +1,16 @@
 use crate::game::player::PlayerSim;
 use crate::game::strategy::{
-    BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
+    BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, PlayerStrategy,
+    Strategy,
 };
+use crate::game::DeckSim;
 use crate::strategy::CountingStrategy;
-use blackjack_lib::{BlackjackGameError, BlackjackTable, Card, Deck};
+use blackjack_lib::{BlackjackGameError, BlackjackTable, Card};
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct DealersHandSim {
-    pub hand: Vec<Rc<Card>>,
+    pub hand: Vec<Arc<Card>>,
     pub hand_value: Vec<u8>,
 }
 
@@ -22,7 +24,7 @@ impl DealersHandSim {
     }
 
     /// Method for receiving a card, changes the state of the `DealersHandSim` instance
-    pub fn receive_card(&mut self, card: Rc<Card>) {
+    pub fn receive_card(&mut self, card: Arc<Card>) {
         let card_val = card.val;
         self.hand.push(card);
         if self.hand_value.is_empty() {
@@ -72,26 +74,18 @@ impl DealersHandSim {
 pub struct BlackjackTableSim {
     pub balance: f32,
     pub hand_log: Option<(i32, i32, i32, f32)>,
-    final_cards: Vec<Rc<Card>>,
+    final_cards: Vec<Arc<Card>>,
     pub dealers_hand: DealersHandSim,
     pub num_player_blackjacks: i32,
     // n_decks: usize,
     n_shuffles: u32,
-    deck: Deck,
+    deck: DeckSim,
 }
 
-// impl BlackjackTableSim {}
-
-/// TODO: Implement missing methods on the blackjack table interface
-impl<C, D, B> BlackjackTable<PlayerSim<C, D, B>> for BlackjackTableSim
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
+impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
     fn new(starting_balance: f32, n_decks: usize, n_shuffles: u32) -> Self {
         let dealers_hand = DealersHandSim::new();
-        let deck = Deck::new(n_decks);
+        let deck = DeckSim::new(n_decks);
         BlackjackTableSim {
             balance: starting_balance,
             hand_log: None,
@@ -106,7 +100,7 @@ where
     /// Takes a player and a bet and handles the logic for placing a bet before a hand is dealt
     fn place_bet(
         &self,
-        player: &mut PlayerSim<C, D, B>,
+        player: &mut PlayerSim<S>,
         bet: f32,
     ) -> Result<(), blackjack_lib::BlackjackGameError> {
         if bet <= 0.0 {
@@ -122,7 +116,7 @@ where
     }
 
     /// Simulates dealing a hand of blackjack, the method may panic if `player` has not placed a valid bet.
-    fn deal_hand(&mut self, player: &mut PlayerSim<C, D, B>) {
+    fn deal_hand(&mut self, player: &mut PlayerSim<S>) {
         assert!(!player.bets.is_empty());
 
         if self.deck.shuffle_flag {
@@ -134,16 +128,16 @@ where
 
         // Now deal cards to player and dealer
         let mut cur_card = self.deck.get_next_card().unwrap();
-        player.receive_card(Rc::clone(&cur_card));
+        player.receive_card(Arc::clone(&cur_card));
         player.update_strategy(Some(&cur_card));
 
         // First card to dealer is face up so the players strategy should be aware of it
         cur_card = self.deck.get_next_card().unwrap();
-        self.dealers_hand.receive_card(Rc::clone(&cur_card));
+        self.dealers_hand.receive_card(Arc::clone(&cur_card));
         player.update_strategy(Some(&cur_card));
 
         cur_card = self.deck.get_next_card().unwrap();
-        player.receive_card(Rc::clone(&cur_card));
+        player.receive_card(Arc::clone(&cur_card));
         player.update_strategy(Some(&cur_card));
 
         // This card is face down so the players strategy should not take this card into account
@@ -170,10 +164,10 @@ where
 
     /// Deals a card to the player, allows the player to update their strategy.
     /// If the player busted, then data about the hand is saved for logging purposes.
-    fn hit(&mut self, player: &mut PlayerSim<C, D, B>) {
+    fn hit(&mut self, player: &mut PlayerSim<S>) {
         // Deal another card to the player and make sure the player updates their strategy
         let card = self.deck.get_next_card().unwrap();
-        player.receive_card(Rc::clone(&card));
+        player.receive_card(Arc::clone(&card));
         player.update_strategy(Some(&card));
         if player.busted() {
             player.lose_current_hand();
@@ -181,40 +175,41 @@ where
     }
 
     /// Method for implementing the logic needed to double down on a bet
-    fn double_down(&mut self, player: &mut PlayerSim<C, D, B>) {
+    fn double_down(&mut self, player: &mut PlayerSim<S>) {
         player.double_down();
         // Deal the player another card
         let card = self.deck.get_next_card().unwrap();
-        player.receive_card(Rc::clone(&card));
+        player.receive_card(Arc::clone(&card));
         player.update_strategy(Some(&card));
         player.stand();
     }
 
     /// Method that implements the logic for splitting
-    fn split(&mut self, player: &mut PlayerSim<C, D, B>) {
+    fn split(&mut self, player: &mut PlayerSim<S>) {
         let (card1, card2) = (
             self.deck.get_next_card().unwrap(),
             self.deck.get_next_card().unwrap(),
         );
-        player.split(Rc::clone(&card1), Rc::clone(&card2));
+        player.split(Arc::clone(&card1), Arc::clone(&card2));
         player.update_strategy(Some(&card1));
         player.update_strategy(Some(&card2));
     }
 
     /// Method that calls the `player`'s stand method.
-    fn stand(&self, player: &mut PlayerSim<C, D, B>) {
+    fn stand(&self, player: &mut PlayerSim<S>) {
         player.stand();
     }
 
     /// Method that computes and returns the optimal final hand for the dealer at the end of a hand of blackjack
     fn get_dealers_optimal_final_hand(&mut self) -> u8 {
         // Reveal dealers face down card here
-        self.final_cards.push(Rc::clone(&self.dealers_hand.hand[1]));
+        self.final_cards
+            .push(Arc::clone(&self.dealers_hand.hand[1]));
 
         if self.dealers_hand.hand_value.len() == 2 {
             while self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] < 17 {
                 let next_card = self.deck.get_next_card().unwrap();
-                self.dealers_hand.receive_card(Rc::clone(&next_card));
+                self.dealers_hand.receive_card(Arc::clone(&next_card));
                 self.final_cards.push(next_card);
             }
 
@@ -223,7 +218,7 @@ where
                 || (self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] > 21)
             {
                 let next_card = self.deck.get_next_card().unwrap();
-                self.dealers_hand.receive_card(Rc::clone(&next_card));
+                self.dealers_hand.receive_card(Arc::clone(&next_card));
                 self.final_cards.push(next_card);
             }
 
@@ -242,7 +237,7 @@ where
 
         while self.dealers_hand.hand_value[0] < 17 {
             let next_card = self.deck.get_next_card().unwrap();
-            self.dealers_hand.receive_card(Rc::clone(&next_card));
+            self.dealers_hand.receive_card(Arc::clone(&next_card));
             self.final_cards.push(next_card);
         }
 
@@ -250,10 +245,10 @@ where
     }
 
     /// Method for finishing the hand and deciding what bet(s) `player` wins or loses
-    fn finish_hand(&mut self, player: &mut PlayerSim<C, D, B>) {
+    fn finish_hand(&mut self, player: &mut PlayerSim<S>) {
         if let Some(players_final_hands) = player.get_optimal_hands() {
             let dealers_optimal_hand =
-                <BlackjackTableSim as BlackjackTable<PlayerSim<C, D, B>>>::get_dealers_optimal_final_hand(
+                <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::get_dealers_optimal_final_hand(
                     self,
                 );
             for (i, bet, hand) in players_final_hands {
@@ -296,16 +291,11 @@ where
 impl BlackjackTableSim {
     /// Takes a `PlayerSim<S>` struct, a HashMap<i32, String> representing the options available during the current turn (these options will be decided during runtime), and an i32 `option`.
     /// The method decides what method to call the implements the appropriate logic, returns a `Result<(), BlackjackGameError>` since the method is fallible.
-    pub fn play_option<C, D, B>(
+    pub fn play_option<S: Strategy>(
         &mut self,
-        player: &mut PlayerSim<C, D, B>,
+        player: &mut PlayerSim<S>,
         option: String,
-    ) -> Result<(), BlackjackGameError>
-    where
-        C: CountingStrategy,
-        D: DecisionStrategy,
-        B: BettingStrategy,
-    {
+    ) -> Result<(), BlackjackGameError> {
         match option.as_str() {
             "stand" => Ok(self.stand(player)),
             "hit" => Ok(self.hit(player)),
@@ -317,8 +307,8 @@ impl BlackjackTableSim {
     }
 
     /// Getter method for the dealers face up card.
-    pub fn dealers_face_up_card(&self) -> Rc<Card> {
-        Rc::clone(&self.dealers_hand.hand[0])
+    pub fn dealers_face_up_card(&self) -> Arc<Card> {
+        Arc::clone(&self.dealers_hand.hand[0])
     }
 
     /// Method for reseting the table for another round, does not reshuffle deck.
@@ -329,12 +319,7 @@ impl BlackjackTableSim {
     }
 
     //TODO: implement surrender functionality eventually
-    pub fn surrender<C, D, B>(&mut self, player: &mut PlayerSim<C, D, B>)
-    where
-        C: CountingStrategy,
-        D: DecisionStrategy,
-        B: BettingStrategy,
-    {
+    pub fn surrender<S: Strategy>(&mut self, player: &mut PlayerSim<S>) {
         let surrender_amount = player.surrender();
         self.balance += surrender_amount;
     }
@@ -342,14 +327,13 @@ impl BlackjackTableSim {
 
 #[test]
 fn test_single_hand() {
-    let strategy = Strategy::new(6, 5)
-        .counting_strategy(HiLo::new(6))
-        .betting_strategy(MarginBettingStrategy::new(3.0, 5))
-        .decision_strategy(BasicStrategy::new())
-        .build();
+    let counting_strategy = HiLo::new(6);
+    let decision_strategy = BasicStrategy::new();
+    let betting_strategy = MarginBettingStrategy::new(3.0, 5);
+    let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
     let mut player = PlayerSim::new(500.0, strategy);
     let mut table = <BlackjackTableSim as BlackjackTable<
-        PlayerSim<HiLo, BasicStrategy, MarginBettingStrategy>,
+        PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     >>::new(f32::MAX, 6, 7);
 
     // Get the bet from the player and place a bet
@@ -406,14 +390,13 @@ fn test_single_hand() {
 
 #[test]
 fn test_single_hand_loop() {
-    let strategy = Strategy::new(6, 5)
-        .counting_strategy(HiLo::new(6))
-        .betting_strategy(MarginBettingStrategy::new(3.0, 5))
-        .decision_strategy(BasicStrategy::new())
-        .build();
+    let counting_strategy = HiLo::new(6);
+    let decision_strategy = BasicStrategy::new();
+    let betting_strategy = MarginBettingStrategy::new(3.0, 5);
+    let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
     let mut player = PlayerSim::new(500.0, strategy);
     let mut table = <BlackjackTableSim as BlackjackTable<
-        PlayerSim<HiLo, BasicStrategy, MarginBettingStrategy>,
+        PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     >>::new(f32::MAX, 6, 7);
 
     // Get bet from player

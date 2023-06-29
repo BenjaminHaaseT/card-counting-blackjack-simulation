@@ -1,31 +1,54 @@
 pub mod game;
+pub mod stats;
 
 use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
 use game::strategy::CountingStrategy;
+use std::error::Error;
+use std::sync::mpsc::{self, channel, Receiver, Sender};
+use std::thread::{self, JoinHandle};
+
 use strategy::{
     BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
 };
 
-// type Result<T, E> = Result<T, BlackjackGameError>;
+pub struct SimulationSummary {
+    pub wins: i32,
+    pub pushes: i32,
+    pub losses: i32,
+    pub early_endings: i32,
+    pub winnings: f32,
+    pub num_hands: u32,
+    pub player_blackjacks: i32,
+}
+
+pub trait BlackjackSimulation: Send {
+    /// Required method, the method that will be called to run all simulations.
+    fn run(&mut self) -> Result<(), BlackjackGameError>;
+    ///Required method, the method that will be called to run a single simulation.
+    fn run_single_simulation(&mut self) -> Result<(), BlackjackGameError>;
+    /// Required method, the method that will display the stats recorded for a given simulation.
+    fn display_stats(&self);
+    /// Required method, the method that will reset the simulation
+    fn reset(&mut self);
+    /// Required method, the method for producing output statistics/data recorded during the simulation
+    fn summary(&self) -> SimulationSummary;
+}
 
 /// Struct for running a number of simulations for a specific strategy.
 /// This struct has the functionality for recording and writing specific stats of interest from the simulation as well.
 /// A `BlackjackSimulator` object's main purupose is conveince, it acts as a wrapper for all the other structs needed to run a blackjack simulation to test a specific strategy.
 /// It allows the user of the object to control specific parameters of a typical blackjack game that one would find at a casino,
 /// such as number of decks, the counting strategy, number of shuffles, minimum bet, etc...
-pub struct BlackjackSimulator<C, D, B>
+pub struct BlackjackSimulator<S>
 where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
+    S: Strategy,
 {
-    // strategy: S,
-    game: BlackjackGameSim<C, D, B>,
+    game: BlackjackGameSim<S>,
     player_starting_balance: f32,
     table_starting_balance: f32,
     num_simulations: u32,
-    // hands_per_simulation: u32,
+    hands_per_simulation: u32,
     accumulated_wins: i32,
     accumulated_pushes: i32,
     accumulated_losses: i32,
@@ -35,16 +58,9 @@ where
     silent: bool,
 }
 
-impl<C, D, B> BlackjackSimulator<C, D, B>
-where
-    C: CountingStrategy,
-    D: DecisionStrategy,
-    B: BettingStrategy,
-{
-    /// Associated function for creating a new blackjack simulation. Takes in the necessary parameters for s
-    /// tarting a blackjack Simulation and returns a new `BlackjackSimulator` object.
+impl<S: Strategy> BlackjackSimulator<S> {
     pub fn new(
-        strategy: Strategy<C, D, B>,
+        strategy: S,
         player_starting_balance: f32,
         table_starting_balance: f32,
         num_simulations: u32,
@@ -55,7 +71,7 @@ where
         silent: bool,
     ) -> Self {
         let player = PlayerSim::new(player_starting_balance, strategy);
-        let table = <BlackjackTableSim as BlackjackTable<PlayerSim<C, D, B>>>::new(
+        let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
             table_starting_balance,
             num_decks,
             num_shuffles,
@@ -66,7 +82,7 @@ where
             player_starting_balance,
             table_starting_balance,
             num_simulations,
-            // hands_per_simulation,
+            hands_per_simulation,
             accumulated_wins: 0,
             accumulated_pushes: 0,
             accumulated_losses: 0,
@@ -76,9 +92,11 @@ where
             silent,
         }
     }
+}
 
+impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
     /// Method that will run the simulation, recording the necessary data. Returns a `Result<(), BlackjackGameError> if an error occurs during any simulation.
-    pub fn run(&mut self) -> Result<(), BlackjackGameError> {
+    fn run(&mut self) -> Result<(), BlackjackGameError> {
         // Run the simulation
         for i in 0..self.num_simulations {
             if let Err(e) = self.game.run() {
@@ -97,15 +115,33 @@ where
                 println!("simulation #{}", i + 1);
                 self.game.display_stats();
             }
+
             // Reset balances for next simulation
             self.game
-                .simulation_reset(self.table_starting_balance, self.player_starting_balance);
+                .reset(self.table_starting_balance, self.player_starting_balance);
+        }
+        Ok(())
+    }
+
+    /// Method to run a single simulation. The state of the simulation is not reset afterwards, nor is any output displayed to the console.
+    fn run_single_simulation(&mut self) -> Result<(), BlackjackGameError> {
+        if let Err(e) = self.game.run() {
+            return Err(e);
+        }
+        // Record the data from the simulation
+        self.accumulated_wins += self.game.total_wins;
+        self.accumulated_pushes += self.game.total_pushes;
+        self.accumulated_losses += self.game.total_losses;
+        self.accumulated_winnings += self.game.total_winnings;
+        self.num_player_blackjacks += self.game.num_player_blackjacks;
+        if self.game.ended_early {
+            self.num_early_endings += 1;
         }
         Ok(())
     }
 
     /// Method that will display the accumulated data recorded from running all simulations.
-    pub fn display_stats(&self) {
+    fn display_stats(&self) {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks:".len() + 20;
         const numeric_width: usize = width - text_width;
@@ -141,6 +177,241 @@ where
         );
         println!("{}", "-".repeat(width));
     }
+
+    /// Method to get a `SimulationSummary` object derived from the current data recorded in `self`.
+    fn summary(&self) -> SimulationSummary {
+        SimulationSummary {
+            wins: self.accumulated_wins,
+            losses: self.accumulated_losses,
+            pushes: self.accumulated_pushes,
+            early_endings: self.num_early_endings,
+            winnings: self.accumulated_winnings,
+            num_hands: self.num_simulations * self.hands_per_simulation,
+            player_blackjacks: self.num_player_blackjacks,
+        }
+    }
+
+    /// Method for reseting the state of the simulation, so it can be run again.
+    /// Note that a simulation must be reset before running another simulation, otherwise the data produced is not meaningful.
+    fn reset(&mut self) {
+        self.game
+            .reset(self.player_starting_balance, self.table_starting_balance);
+    }
+}
+
+/// This struct is for testing multiple strategies at once, designed to give the use options to customize different parameters of the
+/// game while testing multiple strategies. Tests each strategy in parallel to speed up computation.
+pub struct MulStrategyBlackjackSimulator {
+    simulations: Vec<Box<dyn BlackjackSimulation>>,
+    config: BlackjackSimulatorConfig,
+}
+
+impl MulStrategyBlackjackSimulator {
+    /// Method that returns a new `MulStrategyBlackjackSimulatorBuilder` object.
+    pub fn new(config: BlackjackSimulatorConfig) -> MulStrategyBlackjackSimulatorBuilder {
+        MulStrategyBlackjackSimulatorBuilder {
+            simulations: None,
+            config: config,
+        }
+    }
+
+    /// The method that will run each of the strategies in a configured simulation. Each strategy gets tested in a new thread,
+    /// the output of each simulation gets sent to the write module for writing a summary of results to a chosen destination.
+    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+        // Open channel
+        let (write_sender, write_receiver) = mpsc::channel::<(SimulationSummary, usize)>();
+
+        // Spawn thread for writing recorded information
+        let write_handle = thread::spawn(move || stats::write(write_receiver, std::io::stdout()));
+
+        // Collect thread handles
+        let mut handles = vec![];
+
+        for (i, simulation) in self.simulations.into_iter().enumerate() {
+            // Clone the sender to the write_receiver
+            let write_sender_clone = write_sender.clone();
+            // Spawn the thread
+            let handle: JoinHandle<Result<(), BlackjackGameError>> = thread::spawn(move || {
+                for _j in 0..self.config.num_simulations {
+                    simulation.run_single_simulation()?;
+                    // Collect data from simulation
+                    let summary = simulation.summary();
+                    // Send data with cloned sender
+                    write_sender_clone.send((summary, i));
+                    // Reset simulation for the next one
+                    simulation.reset();
+                }
+                Ok(())
+            });
+
+            handles.push(handle);
+        }
+
+        for (i, handle) in handles.into_iter().enumerate() {
+            if let Err(e) = handle.join().unwrap() {
+                eprintln!("error occured for simulation #{i}");
+                return Err(Box::new(e));
+            }
+        }
+
+        // Make sure write_handle has finished as well
+        write_handle.join()?;
+
+        Ok(())
+    }
+}
+
+/// Struct for building a `MulStrategyBlackjackSimulator` object
+pub struct MulStrategyBlackjackSimulatorBuilder {
+    simulations: Option<Vec<Box<dyn BlackjackSimulation>>>,
+    config: BlackjackSimulatorConfig,
+}
+
+impl MulStrategyBlackjackSimulatorBuilder {
+    /// Method for adding a new simulation to the vector of simulations, the only required input is struct that implements the `Strategy` trait,
+    /// the rest of the configurations for the simulation are taken from the preset `BlackjackSimulatorConfig` object that was passed during object creation.
+    fn simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) -> &mut Self {
+        let simulation = Box::new(BlackjackSimulator::new(
+            strategy,
+            self.config.player_starting_balance,
+            self.config.table_starting_balance,
+            self.config.num_simulations,
+            self.config.num_decks,
+            self.config.num_shuffles,
+            self.config.min_bet,
+            self.config.hands_per_simulation,
+            self.config.silent,
+        ));
+        if let Some(ref mut sim_vec) = self.simulations {
+            sim_vec.push(simulation);
+        } else {
+            self.simulations = Some(vec![simulation]);
+        }
+        self
+    }
+
+    /// Method that builds a `MulStrategyBlackjackSimulator` object
+    fn build(self) -> MulStrategyBlackjackSimulator {
+        MulStrategyBlackjackSimulator {
+            simulations: self.simulations.unwrap_or(vec![]),
+            config: self.config,
+        }
+    }
+}
+
+/// Struct for configuring a single `BlackjackSimulator` object
+#[derive(Clone, Copy)]
+pub struct BlackjackSimulatorConfig {
+    pub player_starting_balance: f32,
+    pub table_starting_balance: f32,
+    pub num_simulations: u32,
+    pub num_decks: usize,
+    pub num_shuffles: u32,
+    pub min_bet: u32,
+    pub hands_per_simulation: u32,
+    pub silent: bool,
+}
+
+impl BlackjackSimulatorConfig {
+    /// Associated method for returning a new `BlackjackSimulatorConfigBuilder` object. Allows customization of the BlackjackSimulator
+    /// i.e. allows the user to choose the hyperparameters of the blackjack simulation such as the players starting balance, the number of simulations run,
+    /// the minimum bet per hand, and how many decks are used.
+    pub fn new() -> BlackjackSimulatorConfigBuilder {
+        BlackjackSimulatorConfigBuilder {
+            player_starting_balance: None,
+            table_starting_balance: None,
+            num_simulations: None,
+            num_decks: None,
+            num_shuffles: None,
+            min_bet: None,
+            hands_per_simulation: None,
+            silent: None,
+        }
+    }
+}
+
+impl Default for BlackjackSimulatorConfig {
+    /// Returns the standard configurations for a game of blackjack.
+    fn default() -> Self {
+        BlackjackSimulatorConfig::new().build()
+    }
+}
+
+/// Struct to implement builder pattern for `BlackjackSimulatorConfig`
+pub struct BlackjackSimulatorConfigBuilder {
+    player_starting_balance: Option<f32>,
+    table_starting_balance: Option<f32>,
+    num_simulations: Option<u32>,
+    num_decks: Option<usize>,
+    num_shuffles: Option<u32>,
+    min_bet: Option<u32>,
+    hands_per_simulation: Option<u32>,
+    silent: Option<bool>,
+}
+
+impl BlackjackSimulatorConfigBuilder {
+    /// Method for changing the starting balance of the player.
+    pub fn player_starting_balance(&mut self, balance: f32) -> &mut Self {
+        self.player_starting_balance = Some(balance);
+        self
+    }
+
+    /// Method for changing the starting balance of the table
+    pub fn table_starting_balance(&mut self, balance: f32) -> &mut Self {
+        self.table_starting_balance = Some(balance);
+        self
+    }
+
+    /// Method for settign the number of simulations run.
+    pub fn num_simulations(&mut self, n: u32) -> &mut Self {
+        self.num_simulations = Some(n);
+        self
+    }
+
+    /// Method for choosing the number of decks used in the game
+    pub fn num_decks(&mut self, decks: usize) -> &mut Self {
+        self.num_decks = Some(decks);
+        self
+    }
+
+    /// Method for setting the number of shuffles when shuffling is needed during the simulation
+    pub fn num_shuffles(&mut self, shuffles: u32) -> &mut Self {
+        self.num_shuffles = Some(shuffles);
+        self
+    }
+
+    /// Method for setting the minimum bet for the game
+    pub fn min_bet(&mut self, bet: u32) -> &mut Self {
+        self.min_bet = Some(bet);
+        self
+    }
+
+    /// Method for setting the maximum number of hands that will be played for each simulation
+    pub fn hands_per_simulation(&mut self, hands: u32) -> &mut Self {
+        self.hands_per_simulation = Some(hands);
+        self
+    }
+
+    /// Method for setting a boolean flag, if set to false the `BlackjackSimulator` that is configured with these configurations will display its summary
+    ///  output for each simulation run, otherwise it will remain silent.
+    pub fn silent(&mut self, silent: bool) -> &mut Self {
+        self.silent = Some(silent);
+        self
+    }
+
+    /// Method for building a `BlackjackSimulatorCofig` object from the given `BlackjackSimulatorConfigBuilder` object.
+    pub fn build(self) -> BlackjackSimulatorConfig {
+        BlackjackSimulatorConfig {
+            player_starting_balance: self.player_starting_balance.unwrap_or(500.0),
+            table_starting_balance: self.table_starting_balance.unwrap_or(f32::MAX),
+            num_simulations: self.num_simulations.unwrap_or(100),
+            num_decks: self.num_decks.unwrap_or(6),
+            num_shuffles: self.num_shuffles.unwrap_or(7),
+            min_bet: self.min_bet.unwrap_or(5),
+            hands_per_simulation: self.hands_per_simulation.unwrap_or(50),
+            silent: self.silent.unwrap_or(true),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -148,18 +419,17 @@ mod tests {
     use super::*;
     use strategy::{
         BasicStrategy, BettingStrategy, CountingStrategy, DecisionStrategy, HiLo,
-        MarginBettingStrategy, Strategy, WongHalves,
+        MarginBettingStrategy, PlayerStrategy, Strategy, WongHalves, KO,
     };
 
     #[test]
     fn simple_simulation_test() {
         const MIN_BET: u32 = 5;
         const NUM_DECKS: u32 = 6;
-        let strategy = Strategy::new(NUM_DECKS, MIN_BET)
-            .betting_strategy(MarginBettingStrategy::new(3.0, MIN_BET))
-            .counting_strategy(WongHalves::new(NUM_DECKS))
-            .decision_strategy(BasicStrategy::new())
-            .build();
+        let counting_strategy = KO::new(NUM_DECKS);
+        let decision_strategy = BasicStrategy::new();
+        let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
+        let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
 
         let mut simulator =
             BlackjackSimulator::new(strategy, 500.0, f32::MAX, 50, 6, 7, MIN_BET, 400, false);

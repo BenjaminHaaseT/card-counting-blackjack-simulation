@@ -1,0 +1,3 @@
+-Add unique identifier to data we pass to stats i.e. the simulationsummary object
+-Add stats module for writing stats use multithreading
+-Potentially add a configuring variable path that we can pass to stats to determine where to write the output
