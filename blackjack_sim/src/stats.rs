@@ -10,17 +10,14 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> impl Iterat
     const num_width: usize = width - text_width;
     summaries.into_iter().map(|(id, summary)| {
         let sim_num = format!("simulation #{}", id);
-        format!(
-            "{0:-^width$}\n\
-            {:-width$}\n\
-            {1:<text_width$}{2:>num_width$}\n\
-            {3:<text_width$}{4:>num_width$}\n\
-            {5:<text_width$}{6:>num_width$}\n\
-            {7:<text_width$}{8:>num_width$.2}\n\
-            {9:<text_width$}{10:>num_width$}\n\
-            {11:<text_width$}{12:>num_width$}\n\
-            {:-^width$}",
-            sim_num,
+        let header = format!("{:-^width$}\n", sim_num);
+        let body = format!(
+            "{:<text_width$}{:>num_width$}\n\
+            {:<text_width$}{:>num_width$}\n\
+            {:<text_width$}{:>num_width$}\n\
+            {:<text_width$}{:>num_width$.2}\n\
+            {:<text_width$}{:>num_width$}\n\
+            {:<text_width$}{:>num_width$}\n",
             "hands won",
             summary.wins,
             "hands pushed",
@@ -33,7 +30,32 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> impl Iterat
             summary.player_blackjacks,
             "number of early endings",
             summary.early_endings,
-        )
+        );
+
+        // let body = format!(
+        //     "{1:<text_width$}{2:>num_width$}\n\
+        //     {3:<text_width$}{4:>num_width$}\n\
+        //     {5:<text_width$}{6:>num_width$}\n\
+        //     {7:<text_width$}{8:>num_width$.2}\n\
+        //     {9:<text_width$}{10:>num_width$}\n\
+        //     {11:<text_width$}{12:>num_width$}\n\
+        //     {:-^width$}\n",
+        //     sim_num,
+        //     "hands won",
+        //     summary.wins,
+        //     "hands pushed",
+        //     summary.pushes,
+        //     "hands lost",
+        //     summary.losses,
+        //     "winnings",
+        //     summary.winnings,
+        //     "number of player blackjacks",
+        //     summary.player_blackjacks,
+        //     "number of early endings",
+        //     summary.early_endings,
+        // );
+
+        format!("{}{}{}\n", header, body, "-".repeat(width))
     })
 }
 

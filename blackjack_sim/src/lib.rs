@@ -159,6 +159,10 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
         if self.game.ended_early {
             self.num_early_endings += 1;
         }
+        if !self.silent {
+            // println!("simulation #{}", i + 1);
+            self.game.display_stats();
+        }
         Ok(())
     }
 
@@ -217,7 +221,7 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
     /// Note that a simulation must be reset before running another simulation, otherwise the data produced is not meaningful.
     fn reset(&mut self) {
         self.game
-            .reset(self.player_starting_balance, self.table_starting_balance);
+            .reset(self.table_starting_balance, self.player_starting_balance);
     }
 }
 
@@ -261,20 +265,17 @@ impl MulStrategyBlackjackSimulator {
             // Spawn the thread
             let handle = thread::spawn(move || {
                 for _i in 0..num_simulations {
-                    for _j in 0..hands_per_simulation {
-                        // run a single simulation
-                        if let Err(e) = simulation.run_single_simulation() {
-                            return Err(SimulationError::GameError(e.message));
-                        }
-                        // record data from simulation
-                        let summary = simulation.summary();
-                        // send data to stats module
-                        if let Err(e) = write_sender_clone.send((Some(summary), id)) {
-                            return Err(SimulationError::SendingError(format!("{}", e)));
-                        }
-                        // reset simulation
-                        simulation.reset();
+                    if let Err(e) = simulation.run_single_simulation() {
+                        return Err(SimulationError::GameError(e.message));
                     }
+                    // record data from simulation
+                    let summary = simulation.summary();
+                    // send data to stats module
+                    if let Err(e) = write_sender_clone.send((Some(summary), id)) {
+                        return Err(SimulationError::SendingError(format!("{}", e)));
+                    }
+                    // reset simulation
+                    simulation.reset();
                 }
                 // Tell the stats thread we are finished with this simulation
                 if let Err(e) = write_sender_clone.send((None, id)) {
@@ -442,7 +443,7 @@ impl BlackjackSimulatorConfigBuilder {
     }
 
     /// Method for building a `BlackjackSimulatorCofig` object from the given `BlackjackSimulatorConfigBuilder` object.
-    pub fn build(self) -> BlackjackSimulatorConfig {
+    pub fn build(&mut self) -> BlackjackSimulatorConfig {
         BlackjackSimulatorConfig {
             player_starting_balance: self.player_starting_balance.unwrap_or(500.0),
             table_starting_balance: self.table_starting_balance.unwrap_or(f32::MAX),

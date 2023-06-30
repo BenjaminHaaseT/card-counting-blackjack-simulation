@@ -13,6 +13,16 @@ fn main() {
             BasicStrategy::new(),
             MarginBettingStrategy::new(3.0, 5),
         ))
+        .simulation(PlayerStrategy::new(
+            WongHalves::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            KO::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
         .build();
     let _ = simulator.run();
 }
