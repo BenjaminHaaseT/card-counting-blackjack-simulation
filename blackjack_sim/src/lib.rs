@@ -4,8 +4,10 @@ pub mod stats;
 use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
 use game::strategy::CountingStrategy;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
+use std::iter::FromIterator;
 use std::sync::mpsc::{self, channel, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
@@ -241,13 +243,15 @@ impl MulStrategyBlackjackSimulator {
         // Open channel
         let (write_sender, write_receiver) = mpsc::channel::<(SimulationSummary, usize)>();
 
-        // Spawn thread for writing recorded information
-        let write_handle = thread::spawn(move || stats::write(write_receiver, std::io::stdout()));
-
         // Collect thread handles
         let mut handles = vec![];
         self.simulations.reverse();
         let mut id = 1usize;
+        let ids: HashSet<usize> = HashSet::from_iter(1..=self.simulations.len());
+
+        // Spawn thread for writing recorded information
+        let write_handle =
+            thread::spawn(move || stats::write(write_receiver, ids, std::io::stdout()));
 
         while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver
@@ -265,7 +269,7 @@ impl MulStrategyBlackjackSimulator {
                         // record data from simulation
                         let summary = simulation.summary();
                         // send data to stats module
-                        if let Err(e) = write_sender_clone.send((summary, id)) {
+                        if let Err(e) = write_sender_clone.send((Some(summary), id)) {
                             return Err(SimulationError::SendingError(format!("{}", e)));
                         }
                         // reset simulation
@@ -287,6 +291,7 @@ impl MulStrategyBlackjackSimulator {
         }
 
         // Make sure write_handle has finished as well
+        println!("Waiting to join from stats module");
         if let Err(e) = write_handle.join().unwrap() {
             return Err(SimulationError::WriteError(format!("{}", e)));
         }
@@ -304,7 +309,7 @@ pub struct MulStrategyBlackjackSimulatorBuilder {
 impl MulStrategyBlackjackSimulatorBuilder {
     /// Method for adding a new simulation to the vector of simulations, the only required input is struct that implements the `Strategy` trait,
     /// the rest of the configurations for the simulation are taken from the preset `BlackjackSimulatorConfig` object that was passed during object creation.
-    fn simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) -> &mut Self {
+    pub fn simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) -> &mut Self {
         let simulation = Box::new(BlackjackSimulator::new(
             strategy,
             self.config.player_starting_balance,
@@ -325,9 +330,9 @@ impl MulStrategyBlackjackSimulatorBuilder {
     }
 
     /// Method that builds a `MulStrategyBlackjackSimulator` object
-    fn build(self) -> MulStrategyBlackjackSimulator {
+    pub fn build(&mut self) -> MulStrategyBlackjackSimulator {
         MulStrategyBlackjackSimulator {
-            simulations: self.simulations.unwrap_or(vec![]),
+            simulations: self.simulations.take().unwrap_or(vec![]),
             config: self.config,
         }
     }
@@ -438,11 +443,11 @@ impl BlackjackSimulatorConfigBuilder {
         BlackjackSimulatorConfig {
             player_starting_balance: self.player_starting_balance.unwrap_or(500.0),
             table_starting_balance: self.table_starting_balance.unwrap_or(f32::MAX),
-            num_simulations: self.num_simulations.unwrap_or(100),
+            num_simulations: self.num_simulations.unwrap_or(50),
             num_decks: self.num_decks.unwrap_or(6),
             num_shuffles: self.num_shuffles.unwrap_or(7),
             min_bet: self.min_bet.unwrap_or(5),
-            hands_per_simulation: self.hands_per_simulation.unwrap_or(50),
+            hands_per_simulation: self.hands_per_simulation.unwrap_or(30),
             silent: self.silent.unwrap_or(true),
         }
     }
@@ -473,6 +478,35 @@ mod tests {
         }
 
         simulator.display_stats();
+        assert!(true);
+    }
+
+    #[test]
+    fn run_multiple_simulations() {
+        let mut simulator = MulStrategyBlackjackSimulator::new(BlackjackSimulatorConfig::default())
+            .simulation(PlayerStrategy::new(
+                KO::new(6),
+                BasicStrategy::new(),
+                MarginBettingStrategy::new(3.0, 5),
+            ))
+            .simulation(PlayerStrategy::new(
+                WongHalves::new(6),
+                BasicStrategy::new(),
+                MarginBettingStrategy::new(3.0, 5),
+            ))
+            .simulation(PlayerStrategy::new(
+                HiLo::new(6),
+                BasicStrategy::new(),
+                MarginBettingStrategy::new(3.0, 5),
+            ))
+            .build();
+
+        if let Err(e) = simulator.run() {
+            eprintln!("{}", e);
+            panic!();
+        }
+
+        // test passed if we get to this point
         assert!(true);
     }
 }

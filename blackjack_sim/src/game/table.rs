@@ -366,7 +366,7 @@ fn test_single_hand() {
 
     println!("playing options = {:?}", options);
 
-    let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
+    let decision_result = player.decide_option(Arc::clone(&table.dealers_hand.hand[0]));
 
     if decision_result.is_ok() {
         println!("option chosen = {}", decision_result.as_ref().ok().unwrap());
@@ -437,7 +437,7 @@ fn test_single_hand_loop() {
         let options = player.get_playing_options(table.dealers_face_up_card());
         println!("options: {:?}", options);
 
-        let decision_result = player.decide_option(Rc::clone(&table.dealers_hand.hand[0]));
+        let decision_result = player.decide_option(Arc::clone(&table.dealers_hand.hand[0]));
 
         let decision = match decision_result {
             Ok(d) => {

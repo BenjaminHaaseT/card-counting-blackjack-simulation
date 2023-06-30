@@ -1,5 +1,5 @@
 use crate::SimulationSummary;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::io::Write;
 use std::sync::mpsc::Receiver;
@@ -37,20 +37,30 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> impl Iterat
 
 /// A public function to take in data i.e. `summary` a `SimulationSummary` object and write it to a writer
 pub fn write(
-    receiver: Receiver<(SimulationSummary, usize)>,
+    receiver: Receiver<(Option<SimulationSummary>, usize)>,
+    mut ids: HashSet<usize>,
     mut writer: impl Write,
 ) -> std::io::Result<()> {
     let mut summaries: HashMap<usize, SimulationSummary> = HashMap::new();
-    for (cur_summary, id) in receiver.iter() {
-        if let Some(summary) = summaries.get_mut(&id) {
-            summary.wins += cur_summary.wins;
-            summary.pushes += cur_summary.pushes;
-            summary.losses += cur_summary.losses;
-            summary.winnings += cur_summary.winnings;
-            summary.player_blackjacks += cur_summary.player_blackjacks;
-            summary.early_endings += cur_summary.early_endings;
+    loop {
+        let (cur_summary, id) = receiver.recv().unwrap();
+        if let Some(cur_sum) = cur_summary {
+            if let Some(summary) = summaries.get_mut(&id) {
+                summary.wins += cur_sum.wins;
+                summary.pushes += cur_sum.pushes;
+                summary.losses += cur_sum.losses;
+                summary.winnings += cur_sum.winnings;
+                summary.player_blackjacks += cur_sum.player_blackjacks;
+                summary.early_endings += cur_sum.early_endings;
+            } else {
+                summaries.insert(id, cur_sum);
+            }
         } else {
-            summaries.insert(id, cur_summary);
+            ids.remove(&id);
+            if ids.is_empty() {
+                // We have no more stats to process
+                break;
+            }
         }
     }
     // Write data to writer
