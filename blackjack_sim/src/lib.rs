@@ -241,7 +241,7 @@ impl MulStrategyBlackjackSimulator {
     /// the output of each simulation gets sent to the write module for writing a summary of results to a chosen destination.
     pub fn run(&mut self) -> Result<(), SimulationError> {
         // Open channel
-        let (write_sender, write_receiver) = mpsc::channel::<(SimulationSummary, usize)>();
+        let (write_sender, write_receiver) = mpsc::channel::<(Option<SimulationSummary>, usize)>();
 
         // Collect thread handles
         let mut handles = vec![];
@@ -276,6 +276,10 @@ impl MulStrategyBlackjackSimulator {
                         simulation.reset();
                     }
                 }
+                // Tell the stats thread we are finished with this simulation
+                if let Err(e) = write_sender_clone.send((None, id)) {
+                    return Err(SimulationError::SendingError(format!("{}", e)));
+                }
                 Ok(())
             });
 
@@ -291,7 +295,6 @@ impl MulStrategyBlackjackSimulator {
         }
 
         // Make sure write_handle has finished as well
-        println!("Waiting to join from stats module");
         if let Err(e) = write_handle.join().unwrap() {
             return Err(SimulationError::WriteError(format!("{}", e)));
         }

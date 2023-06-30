@@ -9,6 +9,7 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> impl Iterat
     const text_width: usize = "number of player blackjacks".len() + 20;
     const num_width: usize = width - text_width;
     summaries.into_iter().map(|(id, summary)| {
+        let sim_num = format!("simulation #{}", id);
         format!(
             "{0:-^width$}\n\
             {:-width$}\n\
@@ -17,8 +18,9 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> impl Iterat
             {5:<text_width$}{6:>num_width$}\n\
             {7:<text_width$}{8:>num_width$.2}\n\
             {9:<text_width$}{10:>num_width$}\n\
-            {11:<text_width$}{12:>num_width$}\n",
-            "simulation #{id}",
+            {11:<text_width$}{12:>num_width$}\n\
+            {:-^width$}",
+            sim_num,
             "hands won",
             summary.wins,
             "hands pushed",
