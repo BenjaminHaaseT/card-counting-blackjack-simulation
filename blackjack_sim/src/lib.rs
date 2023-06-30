@@ -5,6 +5,7 @@ use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
 use game::strategy::CountingStrategy;
 use std::error::Error;
+use std::fmt::Display;
 use std::sync::mpsc::{self, channel, Receiver, Sender};
 use std::thread::{self, JoinHandle};
 
@@ -12,6 +13,7 @@ use strategy::{
     BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
 };
 
+/// Simple struct for recording all of the interesting data points accumulated during a simulation
 pub struct SimulationSummary {
     pub wins: i32,
     pub pushes: i32,
@@ -22,6 +24,24 @@ pub struct SimulationSummary {
     pub player_blackjacks: i32,
 }
 
+#[derive(Debug)]
+pub enum SimulationError {
+    GameError(String),
+    SendingError(String),
+    WriteError(String),
+}
+
+impl Display for SimulationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SimulationError::GameError(s)
+            | SimulationError::SendingError(s)
+            | SimulationError::WriteError(s) => write!(f, "{}", s),
+        }
+    }
+}
+
+impl Error for SimulationError {}
 pub trait BlackjackSimulation: Send {
     /// Required method, the method that will be called to run all simulations.
     fn run(&mut self) -> Result<(), BlackjackGameError>;
@@ -217,7 +237,7 @@ impl MulStrategyBlackjackSimulator {
 
     /// The method that will run each of the strategies in a configured simulation. Each strategy gets tested in a new thread,
     /// the output of each simulation gets sent to the write module for writing a summary of results to a chosen destination.
-    pub fn run(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn run(&mut self) -> Result<(), SimulationError> {
         // Open channel
         let (write_sender, write_receiver) = mpsc::channel::<(SimulationSummary, usize)>();
 
@@ -226,36 +246,50 @@ impl MulStrategyBlackjackSimulator {
 
         // Collect thread handles
         let mut handles = vec![];
+        self.simulations.reverse();
+        let mut id = 1usize;
 
-        for (i, simulation) in self.simulations.into_iter().enumerate() {
+        while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver
             let write_sender_clone = write_sender.clone();
+            let num_simulations = self.config.num_simulations;
+            let hands_per_simulation = self.config.hands_per_simulation;
             // Spawn the thread
-            let handle: JoinHandle<Result<(), BlackjackGameError>> = thread::spawn(move || {
-                for _j in 0..self.config.num_simulations {
-                    simulation.run_single_simulation()?;
-                    // Collect data from simulation
-                    let summary = simulation.summary();
-                    // Send data with cloned sender
-                    write_sender_clone.send((summary, i));
-                    // Reset simulation for the next one
-                    simulation.reset();
+            let handle = thread::spawn(move || {
+                for _i in 0..num_simulations {
+                    for _j in 0..hands_per_simulation {
+                        // run a single simulation
+                        if let Err(e) = simulation.run_single_simulation() {
+                            return Err(SimulationError::GameError(e.message));
+                        }
+                        // record data from simulation
+                        let summary = simulation.summary();
+                        // send data to stats module
+                        if let Err(e) = write_sender_clone.send((summary, id)) {
+                            return Err(SimulationError::SendingError(format!("{}", e)));
+                        }
+                        // reset simulation
+                        simulation.reset();
+                    }
                 }
                 Ok(())
             });
 
             handles.push(handle);
+            id += 1;
         }
 
         for (i, handle) in handles.into_iter().enumerate() {
             if let Err(e) = handle.join().unwrap() {
                 eprintln!("error occured for simulation #{i}");
-                return Err(Box::new(e));
+                return Err(e);
             }
         }
 
         // Make sure write_handle has finished as well
-        write_handle.join()?;
+        if let Err(e) = write_handle.join().unwrap() {
+            return Err(SimulationError::WriteError(format!("{}", e)));
+        }
 
         Ok(())
     }
