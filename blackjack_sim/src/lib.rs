@@ -280,6 +280,7 @@ impl MulStrategyBlackjackSimulator {
         let mut handles = vec![];
         self.simulations.reverse();
         let mut id = 1usize;
+        // Create unique id's for each simulation, that way the writing thread knows when one simulation is done
         let ids: HashSet<usize> = HashSet::from_iter(1..=self.simulations.len());
 
         // Spawn thread for writing recorded information
@@ -291,7 +292,7 @@ impl MulStrategyBlackjackSimulator {
             let write_sender_clone = write_sender.clone();
             let num_simulations = self.config.num_simulations;
 
-            // Spawn the thread
+            // Spawn the thread for each simulation
             let handle = thread::spawn(move || {
                 for _i in 0..num_simulations {
                     if let Err(e) = simulation.run_single_simulation() {
