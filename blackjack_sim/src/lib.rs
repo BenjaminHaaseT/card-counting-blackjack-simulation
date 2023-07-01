@@ -26,6 +26,35 @@ pub struct SimulationSummary {
     pub player_blackjacks: i32,
 }
 
+impl Display for SimulationSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        const width: usize = 80;
+        const text_width: usize = "number of player blackjacks".len() + 20;
+        const num_width: usize = width - text_width;
+        let body = format!(
+            "{:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$.2}\n\
+        {:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$}\n",
+            "hands won",
+            self.wins,
+            "hands pushed",
+            self.pushes,
+            "hands lost",
+            self.losses,
+            "winnings",
+            self.winnings,
+            "number of player blackjacks",
+            self.player_blackjacks,
+            "number of early endings",
+            self.early_endings,
+        );
+        write!(f, "{}", body)
+    }
+}
+
 #[derive(Debug)]
 pub enum SimulationError {
     GameError(String),
@@ -261,7 +290,7 @@ impl MulStrategyBlackjackSimulator {
             // Clone the sender to the write_receiver
             let write_sender_clone = write_sender.clone();
             let num_simulations = self.config.num_simulations;
-            let hands_per_simulation = self.config.hands_per_simulation;
+
             // Spawn the thread
             let handle = thread::spawn(move || {
                 for _i in 0..num_simulations {
@@ -447,11 +476,11 @@ impl BlackjackSimulatorConfigBuilder {
         BlackjackSimulatorConfig {
             player_starting_balance: self.player_starting_balance.unwrap_or(500.0),
             table_starting_balance: self.table_starting_balance.unwrap_or(f32::MAX),
-            num_simulations: self.num_simulations.unwrap_or(50),
+            num_simulations: self.num_simulations.unwrap_or(100),
             num_decks: self.num_decks.unwrap_or(6),
             num_shuffles: self.num_shuffles.unwrap_or(7),
             min_bet: self.min_bet.unwrap_or(5),
-            hands_per_simulation: self.hands_per_simulation.unwrap_or(30),
+            hands_per_simulation: self.hands_per_simulation.unwrap_or(50),
             silent: self.silent.unwrap_or(true),
         }
     }
