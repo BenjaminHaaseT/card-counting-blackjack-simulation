@@ -24,6 +24,7 @@ pub struct SimulationSummary {
     pub winnings: f32,
     pub num_hands: u32,
     pub player_blackjacks: i32,
+    pub label: String,
 }
 
 impl Display for SimulationSummary {
@@ -32,12 +33,15 @@ impl Display for SimulationSummary {
         const text_width: usize = "number of player blackjacks".len() + 20;
         const num_width: usize = width - text_width;
         let body = format!(
-            "{:<text_width$}{:>num_width$}\n\
+            "{}{}\n\
+        {:<text_width$}{:>num_width$}\n\
         {:<text_width$}{:>num_width$}\n\
         {:<text_width$}{:>num_width$}\n\
         {:<text_width$}{:>num_width$.2}\n\
         {:<text_width$}{:>num_width$}\n\
         {:<text_width$}{:>num_width$}\n",
+            "strategy: ",
+            self.label,
             "hands won",
             self.wins,
             "hands pushed",
@@ -242,6 +246,7 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
             winnings: self.accumulated_winnings,
             num_hands: self.num_simulations * self.hands_per_simulation,
             player_blackjacks: self.num_player_blackjacks,
+            label: self.game.label(),
         }
     }
 
@@ -279,8 +284,9 @@ impl MulStrategyBlackjackSimulator {
         let mut handles = vec![];
         self.simulations.reverse();
         let mut id = 1usize;
+
         // Create unique id's for each simulation, that way the writing thread knows when one simulation is done
-        let ids: HashSet<usize> = HashSet::from_iter(1..=self.simulations.len());
+        let ids = HashSet::from_iter(1..=self.simulations.len());
 
         // Spawn thread for writing recorded information
         let write_handle =

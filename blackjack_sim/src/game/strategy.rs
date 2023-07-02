@@ -86,6 +86,7 @@ pub trait CountingStrategy {
     fn reset(&mut self);
     fn running_count(&self) -> f32;
     fn true_count(&self) -> f32;
+    fn name(&self) -> String;
 }
 
 /// Struct that encapsulates the logic needed for a simple margin based betting strategy, i.e. for each positive value that the true count takes it will compute the bet as
@@ -399,6 +400,10 @@ impl CountingStrategy for HiLo {
         self.total_cards_counted = 0;
         self.true_count = 0.0;
     }
+
+    fn name(&self) -> String {
+        String::from("HiLo")
+    }
 }
 
 impl Display for HiLo {
@@ -492,6 +497,10 @@ impl CountingStrategy for WongHalves {
     fn true_count(&self) -> f32 {
         self.true_count
     }
+
+    fn name(&self) -> String {
+        String::from("Wong Halves")
+    }
 }
 
 /// Struct that implements the popular Knockout card counting strategy. No need to compute a true count.
@@ -560,6 +569,11 @@ impl CountingStrategy for KO {
     /// Reset the counting strategy. We only need to reset the running count to 4 - total number of decks * 4.
     fn reset(&mut self) {
         self.running_count = 4 - (self.num_decks as i32) * 4;
+    }
+
+    /// Method to get the name of the strategy
+    fn name(&self) -> String {
+        String::from("KO")
     }
 }
 
@@ -635,6 +649,11 @@ impl CountingStrategy for HiOptI {
         self.total_cards_counted = 0;
         self.true_count = 0.0;
     }
+
+    /// Returns the name of the strategy, useful for display purposes
+    fn name(&self) -> String {
+        String::from("HiOptI")
+    }
 }
 
 /// A struct that implements the HiOptII counting method
@@ -709,6 +728,10 @@ impl CountingStrategy for HiOptII {
         self.running_count = 0;
         self.total_cards_counted = 0;
         self.true_count = 0.0;
+    }
+
+    fn name(&self) -> String {
+        String::from("HiOptII")
     }
 }
 
@@ -793,6 +816,10 @@ impl CountingStrategy for RedSeven {
         self.true_count = 0.0;
         self.total_cards_counted = 0;
     }
+
+    fn name(&self) -> String {
+        String::from("Red Seven")
+    }
 }
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.
 #[derive(Debug)]
@@ -805,6 +832,7 @@ where
     counting_strategy: C,
     decision_strategy: D,
     betting_strategy: B,
+    counting_strategy_name: String,
 }
 
 impl<C, D, B> PlayerStrategy<C, D, B>
@@ -814,10 +842,12 @@ where
     B: BettingStrategy,
 {
     pub fn new(counting_strategy: C, decision_strategy: D, betting_strategy: B) -> Self {
+        let counting_strategy_name = counting_strategy.name();
         PlayerStrategy {
             counting_strategy,
             decision_strategy,
             betting_strategy,
+            counting_strategy_name,
         }
     }
 }
@@ -879,6 +909,10 @@ where
             dealers_up_card,
         )
     }
+
+    fn label(&self) -> String {
+        self.counting_strategy_name.clone()
+    }
 }
 
 /// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
@@ -900,6 +934,8 @@ pub trait Strategy {
         balance: f32,
         dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
+    /// Method for getting a lable that decsribes this strategy
+    fn label(&self) -> String;
 }
 
 #[cfg(test)]

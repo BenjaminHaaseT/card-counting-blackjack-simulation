@@ -330,6 +330,11 @@ impl<S: Strategy> PlayerSim<S> {
         self.strategy.decide_option(current_state, options)
     }
 
+    /// Method to get a string that describes the players strategy
+    pub fn label(&self) -> String {
+        self.strategy.label()
+    }
+
     pub fn reset_strategy(&mut self) {
         self.strategy.reset();
     }

@@ -245,6 +245,10 @@ impl<S: Strategy> BlackjackGameSim<S> {
         self.total_winnings = 0.0;
         self.ended_early = false;
     }
+
+    pub fn label(&self) -> String {
+        self.player.label()
+    }
 }
 
 #[cfg(test)]

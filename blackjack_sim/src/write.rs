@@ -47,6 +47,7 @@ pub fn write(
             }
         }
     }
+
     // Get summaries into nicely formatted strings, and write to writer
     let formatted_summaries = format_summaries(summaries);
     for i in 1..=formatted_summaries.len() {
