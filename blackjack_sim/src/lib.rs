@@ -1,5 +1,5 @@
 pub mod game;
-pub mod stats;
+pub mod write;
 
 use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
@@ -189,7 +189,6 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
             self.num_early_endings += 1;
         }
         if !self.silent {
-            // println!("simulation #{}", i + 1);
             self.game.display_stats();
         }
         Ok(())
@@ -271,7 +270,7 @@ impl MulStrategyBlackjackSimulator {
     }
 
     /// The method that will run each of the strategies in a configured simulation. Each strategy gets tested in a new thread,
-    /// the output of each simulation gets sent to the write module for writing a summary of results to a chosen destination.
+    /// the output of each simulation gets sent to the stats module for writing a summary of results to a chosen destination.
     pub fn run(&mut self) -> Result<(), SimulationError> {
         // Open channel
         let (write_sender, write_receiver) = mpsc::channel::<(Option<SimulationSummary>, usize)>();
@@ -285,7 +284,7 @@ impl MulStrategyBlackjackSimulator {
 
         // Spawn thread for writing recorded information
         let write_handle =
-            thread::spawn(move || stats::write(write_receiver, ids, std::io::stdout()));
+            thread::spawn(move || write::write(write_receiver, ids, std::io::stdout()));
 
         while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver

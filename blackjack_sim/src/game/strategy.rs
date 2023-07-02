@@ -3,6 +3,7 @@
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+// use std::fmt::Display;
 use std::sync::Arc;
 
 pub mod prelude {
@@ -559,6 +560,238 @@ impl CountingStrategy for KO {
     /// Reset the counting strategy. We only need to reset the running count to 4 - total number of decks * 4.
     fn reset(&mut self) {
         self.running_count = 4 - (self.num_decks as i32) * 4;
+    }
+}
+
+/// A struct that implements the HiOpt1 counting method
+pub struct HiOptI {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for HiOptI {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(2, 0);
+        for i in 3..=6_u8 {
+            lookup_table.insert(i, 1);
+        }
+        for i in 7..=9_u8 {
+            lookup_table.insert(i, 0);
+        }
+        lookup_table.insert(1, 0);
+        lookup_table.insert(10, -1);
+
+        HiOptI {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks_played =
+            (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks_played;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.total_cards_counted = 0;
+        self.true_count = 0.0;
+    }
+}
+
+/// A struct that implements the HiOptII counting method
+pub struct HiOptII {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for HiOptII {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(2, 1);
+        lookup_table.insert(3, 1);
+        lookup_table.insert(4, 2);
+        lookup_table.insert(5, 2);
+        lookup_table.insert(6, 1);
+        lookup_table.insert(7, 1);
+        lookup_table.insert(8, 0);
+        lookup_table.insert(9, 0);
+        lookup_table.insert(10, -2);
+        lookup_table.insert(1, 0);
+
+        HiOptII {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks_played =
+            (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks_played;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.total_cards_counted = 0;
+        self.true_count = 0.0;
+    }
+}
+
+/// A struct that implements Red Seven counting method
+pub struct RedSeven {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for RedSeven {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 2..=6_u8 {
+            lookup_table.insert(i, -1);
+        }
+        for i in 8..=9_u8 {
+            lookup_table.insert(i, 0);
+        }
+        lookup_table.insert(10, -1);
+        lookup_table.insert(1, -1);
+
+        RedSeven {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        let card_index = match self.lookup_table.get(&card.val) {
+            Some(v) => *v,
+            None => {
+                if card.suit == "H" || card.suit == "D" {
+                    1
+                } else {
+                    0
+                }
+            }
+        };
+
+        self.running_count += card_index;
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
     }
 }
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.

@@ -1,3 +1,7 @@
--Add unique identifier to data we pass to stats i.e. the simulationsummary object
--Add stats module for writing stats use multithreading
--Potentially add a configuring variable path that we can pass to stats to determine where to write the output
+-Add all counting strategies
+-Add illustrious 18 decision strategy
+-Add configuration options, so user can decide what parameters to tweak
+-Add insurance?
+-Add way so user can tweak rules of the game i.e add a game config builder
+-Eventually add a way to a Betting strategy/counting strategy can be created w/ macros
+-Create API and a user interface so that game parameters can be tweaked on demand
