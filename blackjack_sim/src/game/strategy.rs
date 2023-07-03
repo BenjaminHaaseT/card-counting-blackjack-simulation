@@ -821,6 +821,546 @@ impl CountingStrategy for RedSeven {
         String::from("Red Seven")
     }
 }
+
+/// A struct that implements the OmegaII card counting method
+pub struct OmegaII {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for OmegaII {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(2, 1);
+        lookup_table.insert(3, 1);
+        lookup_table.insert(4, 2);
+        lookup_table.insert(5, 2);
+        lookup_table.insert(6, 2);
+        lookup_table.insert(7, 1);
+        lookup_table.insert(8, 0);
+        lookup_table.insert(9, -1);
+        lookup_table.insert(10, -2);
+        lookup_table.insert(1, 0);
+        OmegaII {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("OmegaII")
+    }
+}
+
+/// A struct that implements the Ace/Five counting strategy
+pub struct AceFive {
+    running_count: i32,
+    num_decks: u32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for AceFive {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 1..=10_u8 {
+            lookup_table.insert(
+                i,
+                if i == 5 {
+                    1
+                } else if i == 1 {
+                    -1
+                } else {
+                    0
+                },
+            );
+        }
+        AceFive {
+            running_count: 0,
+            num_decks,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.running_count as f32,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.running_count()
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("Ace/Five")
+    }
+}
+
+/// A struct that implements the Zen Count card counting technique
+pub struct ZenCount {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for ZenCount {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(2, 1);
+        lookup_table.insert(3, 1);
+        lookup_table.insert(4, 2);
+        lookup_table.insert(5, 2);
+        lookup_table.insert(6, 2);
+        lookup_table.insert(7, 1);
+        lookup_table.insert(8, 0);
+        lookup_table.insert(9, 0);
+        lookup_table.insert(10, -2);
+        lookup_table.insert(1, -1);
+        ZenCount {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("Zen Count")
+    }
+}
+
+/// A struct that implements the Halves counting strategy
+pub struct Halves {
+    running_count: f32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, f32>,
+}
+
+impl CountingStrategy for Halves {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        lookup_table.insert(2, 0.5);
+        lookup_table.insert(3, 1.0);
+        lookup_table.insert(4, 1.0);
+        lookup_table.insert(5, 1.5);
+        lookup_table.insert(6, 1.0);
+        lookup_table.insert(7, 0.5);
+        lookup_table.insert(8, 0.0);
+        lookup_table.insert(9, -0.5);
+        lookup_table.insert(10, -1.0);
+        lookup_table.insert(1, -1.0);
+        Halves {
+            running_count: 0.0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = self.running_count / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0.0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("Halves")
+    }
+}
+
+/// A struct that implements the KISS counting strategy
+pub struct KISS {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for KISS {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 1..=10u8 {
+            match i {
+                4..=6 => lookup_table.insert(i, 1),
+                10 => lookup_table.insert(i, -1),
+                _ => lookup_table.insert(i, 0),
+            };
+        }
+        KISS {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("KISS")
+    }
+}
+
+/// A struct that implements the KISSII counting strategy
+pub struct KISSII {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for KISSII {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 4..=10u8 {
+            match i {
+                3..=6 => lookup_table.insert(i, 1),
+                7..=9 => lookup_table.insert(i, 0),
+                _ => lookup_table.insert(i, -1),
+            };
+        }
+        lookup_table.insert(1, -1);
+        KISSII {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        let index = match self.lookup_table.get(&card.val) {
+            Some(i) => *i,
+            _ => match card.suit {
+                "H" | "D" => 0,
+                _ => 1,
+            },
+        };
+        self.running_count += index;
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("KISS II")
+    }
+}
+
+/// A struct that implements the KISS III counting strategy
+pub struct KISSIII {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for KISSIII {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 3..=10 {
+            match i {
+                3..=7 => lookup_table.insert(i, 1),
+                8 | 9 => lookup_table.insert(i, 0),
+                _ => lookup_table.insert(i, -1),
+            };
+        }
+        lookup_table.insert(1, -1);
+        KISSIII {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        let index = match self.lookup_table.get(&card.val) {
+            Some(i) => *i,
+            _ => match card.suit {
+                "H" | "D" => 0,
+                _ => 1,
+            },
+        };
+        self.running_count += index;
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("KISS III")
+    }
+}
+
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.
 #[derive(Debug)]
 pub struct PlayerStrategy<C, D, B>

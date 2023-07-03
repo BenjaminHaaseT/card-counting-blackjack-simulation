@@ -1,6 +1,6 @@
 use blackjack_sim::strategy::{
-    BasicStrategy, CountingStrategy, HiLo, HiOptI, HiOptII, MarginBettingStrategy, PlayerStrategy,
-    RedSeven, WongHalves, KO,
+    AceFive, BasicStrategy, CountingStrategy, Halves, HiLo, HiOptI, HiOptII, MarginBettingStrategy,
+    OmegaII, PlayerStrategy, RedSeven, WongHalves, ZenCount, KISS, KISSII, KISSIII, KO,
 };
 
 use blackjack_sim::{
@@ -37,6 +37,41 @@ fn main() {
         ))
         .simulation(PlayerStrategy::new(
             HiOptII::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            AceFive::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            OmegaII::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            ZenCount::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            Halves::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            KISS::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            KISSII::new(6),
+            BasicStrategy::new(),
+            MarginBettingStrategy::new(3.0, 5),
+        ))
+        .simulation(PlayerStrategy::new(
+            KISSIII::new(6),
             BasicStrategy::new(),
             MarginBettingStrategy::new(3.0, 5),
         ))

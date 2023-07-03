@@ -1,7 +1,7 @@
--Add all counting strategies
--Add illustrious 18 decision strategy
--Add configuration options, so user can decide what parameters to tweak
+-Add all (common) counting strategies
+-Add configuration options via command line arguments
 -Add insurance?
--Add way so user can tweak rules of the game i.e add a game config builder
--Eventually add a way to a Betting strategy/counting strategy can be created w/ macros
+-Add way so user can tweak rules of the game i.e add a game config builder such that a user can determine whether or not to have insurance, surrender etc...
+-Add illustrious 18 decision strategy
+-Add a way to create betting/counting strategies w/ macros
 -Create API and a user interface so that game parameters can be tweaked on demand
