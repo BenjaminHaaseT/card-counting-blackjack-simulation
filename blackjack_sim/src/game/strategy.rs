@@ -1361,6 +1361,228 @@ impl CountingStrategy for KISSIII {
     }
 }
 
+/// A struct that implements the J. Noir card counting strategy
+pub struct JNoir {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for JNoir {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 1..=10u8 {
+            match i {
+                3..=9 => lookup_table.insert(i, 1),
+                _ => lookup_table.insert(i, -2),
+            };
+        }
+        JNoir {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("J. Noir")
+    }
+}
+
+/// A struct that implements the Silver Fox card counting method
+pub struct SilverFox {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for SilverFox {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 1..=10 {
+            match i {
+                2..=7 => lookup_table.insert(i, 1),
+                8 => lookup_table.insert(i, 0),
+                _ => lookup_table.insert(i, -1),
+            };
+        }
+        SilverFox {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("Silver Fox")
+    }
+}
+
+/// A struct that implements teh Unbalanced Zen 2 counting method
+pub struct UnbalancedZen2 {
+    running_count: i32,
+    true_count: f32,
+    num_decks: u32,
+    total_cards_counted: i32,
+    lookup_table: HashMap<u8, i32>,
+}
+
+impl CountingStrategy for UnbalancedZen2 {
+    fn new(num_decks: u32) -> Self {
+        let mut lookup_table = HashMap::new();
+        for i in 1..=10u8 {
+            match i {
+                2 | 7 => lookup_table.insert(i, 1),
+                3..=6 => lookup_table.insert(i, 2),
+                8 | 9 => lookup_table.insert(i, 0),
+                10 => lookup_table.insert(i, -2),
+                _ => lookup_table.insert(i, -1),
+            };
+        }
+        UnbalancedZen2 {
+            running_count: 0,
+            true_count: 0.0,
+            num_decks,
+            total_cards_counted: 0,
+            lookup_table,
+        }
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.running_count += self.lookup_table[&card.val];
+        self.total_cards_counted += 1;
+        let estimated_decks = (self.num_decks as f32) - ((self.total_cards_counted as f32) / 52.0);
+        self.true_count = (self.running_count as f32) / estimated_decks;
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        TableState {
+            hand,
+            hand_value,
+            bet,
+            balance,
+            running_count: self.running_count as f32,
+            true_count: self.true_count,
+            num_decks: self.num_decks,
+            dealers_up_card,
+        }
+    }
+
+    fn running_count(&self) -> f32 {
+        self.running_count as f32
+    }
+
+    fn true_count(&self) -> f32 {
+        self.true_count
+    }
+
+    fn reset(&mut self) {
+        self.running_count = 0;
+        self.true_count = 0.0;
+        self.total_cards_counted = 0;
+    }
+
+    fn name(&self) -> String {
+        String::from("Unbalanced Zen 2")
+    }
+}
 /// A struct that encapsulates everything needed to implement a specific playing to test in a simulation.
 #[derive(Debug)]
 pub struct PlayerStrategy<C, D, B>
