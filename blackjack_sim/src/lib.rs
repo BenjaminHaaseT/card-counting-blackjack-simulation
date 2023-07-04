@@ -277,7 +277,10 @@ impl MulStrategyBlackjackSimulator {
 
     /// The method that will run each of the strategies in a configured simulation. Each strategy gets tested in a new thread,
     /// the output of each simulation gets sent to the stats module for writing a summary of results to a chosen destination.
-    pub fn run(&mut self) -> Result<(), SimulationError> {
+    pub fn run(
+        &mut self,
+        file_out: Box<dyn Write + Send + 'static>,
+    ) -> Result<(), SimulationError> {
         // Open channel
         let (write_sender, write_receiver) = mpsc::channel::<(Option<SimulationSummary>, usize)>();
 
@@ -291,7 +294,7 @@ impl MulStrategyBlackjackSimulator {
 
         // Spawn thread for writing recorded information
         let write_handle =
-            thread::spawn(move || write::write_summaries(write_receiver, ids, std::io::stdout()));
+            thread::spawn(move || write::write_summaries(write_receiver, ids, file_out));
 
         while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver
@@ -420,6 +423,7 @@ impl Default for BlackjackSimulatorConfig {
 }
 
 /// Struct to implement builder pattern for `BlackjackSimulatorConfig`
+#[derive(Clone, Copy)]
 pub struct BlackjackSimulatorConfigBuilder {
     player_starting_balance: Option<f32>,
     table_starting_balance: Option<f32>,
@@ -562,7 +566,7 @@ mod tests {
             ))
             .build();
 
-        if let Err(e) = simulator.run() {
+        if let Err(e) = simulator.run(Box::new(std::io::stdout())) {
             eprintln!("{}", e);
             panic!();
         }

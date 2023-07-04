@@ -1,6 +1,4 @@
--Add all (common) counting strategies
 -Add configuration options via command line arguments
--Add insurance?
 -Add way so user can tweak rules of the game i.e add a game config builder such that a user can determine whether or not to have insurance, surrender etc...
 -Add illustrious 18 decision strategy
 -Add a way to create betting/counting strategies w/ macros

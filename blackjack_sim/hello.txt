@@ -1,0 +1,144 @@
+---------------------------------simulation #1----------------------------------
+strategy: HiLo
+hands won                                                               13368286
+hands pushed                                                             2596369
+hands lost                                                              14741012
+winnings                                                              2556974.00
+number of player blackjacks                                              1446855
+number of early endings                                                    13537
+--------------------------------------------------------------------------------
+---------------------------------simulation #2----------------------------------
+strategy: Wong Halves
+hands won                                                               13381109
+hands pushed                                                             2636727
+hands lost                                                              14641319
+winnings                                                              4696571.50
+number of player blackjacks                                              1427295
+number of early endings                                                    12781
+--------------------------------------------------------------------------------
+---------------------------------simulation #3----------------------------------
+strategy: KO
+hands won                                                               12699192
+hands pushed                                                             2549581
+hands lost                                                              13928379
+winnings                                                              3578739.00
+number of player blackjacks                                              1336156
+number of early endings                                                    15349
+--------------------------------------------------------------------------------
+---------------------------------simulation #4----------------------------------
+strategy: Red Seven
+hands won                                                               14362847
+hands pushed                                                             2791904
+hands lost                                                              15645347
+winnings                                                               808315.00
+number of player blackjacks                                              1568592
+number of early endings                                                        0
+--------------------------------------------------------------------------------
+---------------------------------simulation #5----------------------------------
+strategy: HiOptI
+hands won                                                               13155099
+hands pushed                                                             2579500
+hands lost                                                              14565335
+winnings                                                              -544252.00
+number of player blackjacks                                              1397751
+number of early endings                                                    13116
+--------------------------------------------------------------------------------
+---------------------------------simulation #6----------------------------------
+strategy: HiOptII
+hands won                                                               10994657
+hands pushed                                                             2246002
+hands lost                                                              12191655
+winnings                                                             -2405026.50
+number of player blackjacks                                              1171757
+number of early endings                                                    31109
+--------------------------------------------------------------------------------
+---------------------------------simulation #7----------------------------------
+strategy: Ace/Five
+hands won                                                               12935193
+hands pushed                                                             2523723
+hands lost                                                              14336916
+winnings                                                             -2310524.50
+number of player blackjacks                                              1363033
+number of early endings                                                    15371
+--------------------------------------------------------------------------------
+---------------------------------simulation #8----------------------------------
+strategy: OmegaII
+hands won                                                               11175735
+hands pushed                                                             2155421
+hands lost                                                              12160001
+winnings                                                              6101712.50
+number of player blackjacks                                              1173907
+number of early endings                                                    30254
+--------------------------------------------------------------------------------
+---------------------------------simulation #9----------------------------------
+strategy: Zen Count
+hands won                                                               10501345
+hands pushed                                                             2060229
+hands lost                                                              11548826
+winnings                                                              2967074.50
+number of player blackjacks                                              1130051
+number of early endings                                                    34327
+--------------------------------------------------------------------------------
+---------------------------------simulation #10---------------------------------
+strategy: Halves
+hands won                                                               13546356
+hands pushed                                                             2681830
+hands lost                                                              14767577
+winnings                                                              7076296.00
+number of player blackjacks                                              1430182
+number of early endings                                                    10667
+--------------------------------------------------------------------------------
+---------------------------------simulation #11---------------------------------
+strategy: KISS
+hands won                                                               14398290
+hands pushed                                                             2743422
+hands lost                                                              15644992
+winnings                                                               672867.50
+number of player blackjacks                                              1520028
+number of early endings                                                        0
+--------------------------------------------------------------------------------
+---------------------------------simulation #12---------------------------------
+strategy: KISS II
+hands won                                                               14322831
+hands pushed                                                             2795256
+hands lost                                                              15658526
+winnings                                                               445662.50
+number of player blackjacks                                              1524864
+number of early endings                                                        0
+--------------------------------------------------------------------------------
+---------------------------------simulation #13---------------------------------
+strategy: KISS III
+hands won                                                                9983329
+hands pushed                                                             1975361
+hands lost                                                              11006729
+winnings                                                              4368110.00
+number of player blackjacks                                              1054272
+number of early endings                                                    37763
+--------------------------------------------------------------------------------
+---------------------------------simulation #14---------------------------------
+strategy: Silver Fox
+hands won                                                               13129122
+hands pushed                                                             2600221
+hands lost                                                              14463105
+winnings                                                              5490148.00
+number of player blackjacks                                              1433107
+number of early endings                                                    13948
+--------------------------------------------------------------------------------
+---------------------------------simulation #15---------------------------------
+strategy: J. Noir
+hands won                                                               14342370
+hands pushed                                                             2800510
+hands lost                                                              15635476
+winnings                                                               775555.00
+number of player blackjacks                                              1533365
+number of early endings                                                        0
+--------------------------------------------------------------------------------
+---------------------------------simulation #16---------------------------------
+strategy: Unbalanced Zen 2
+hands won                                                                6781771
+hands pushed                                                             1287133
+hands lost                                                               7367152
+winnings                                                              7455742.50
+number of player blackjacks                                               724722
+number of early endings                                                    54046
+--------------------------------------------------------------------------------
