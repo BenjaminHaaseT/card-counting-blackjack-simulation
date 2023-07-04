@@ -14,11 +14,12 @@ pub struct PlayerSim<S: Strategy> {
     hand_idx: usize,
     pub balance: f32,
     strategy: S,
+    surrender_flag: bool,
 }
 
 impl<S: Strategy> PlayerSim<S> {
     /// Associated function to create a new `PlayerSim` struct.
-    pub fn new(starting_balance: f32, strategy: S) -> PlayerSim<S> {
+    pub fn new(starting_balance: f32, strategy: S, surrender_flag: bool) -> PlayerSim<S> {
         PlayerSim {
             hand: vec![vec![]],
             hand_values: vec![vec![]],
@@ -27,6 +28,7 @@ impl<S: Strategy> PlayerSim<S> {
             hand_idx: 0,
             balance: starting_balance,
             strategy,
+            surrender_flag,
         }
     }
 
@@ -117,7 +119,7 @@ impl<S: Strategy> PlayerSim<S> {
         let mut options = HashSet::new();
         options.insert("stand".to_string());
         options.insert("hit".to_string());
-        if self.can_surrender(dealers_up_card) {
+        if self.surrender_flag && self.can_surrender(dealers_up_card) {
             options.insert("surrender".to_string());
         }
         if self.can_split() {

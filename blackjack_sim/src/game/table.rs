@@ -331,7 +331,7 @@ fn test_single_hand() {
     let decision_strategy = BasicStrategy::new();
     let betting_strategy = MarginBettingStrategy::new(3.0, 5);
     let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
-    let mut player = PlayerSim::new(500.0, strategy);
+    let mut player = PlayerSim::new(500.0, strategy, true);
     let mut table = <BlackjackTableSim as BlackjackTable<
         PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     >>::new(f32::MAX, 6, 7);
@@ -394,7 +394,7 @@ fn test_single_hand_loop() {
     let decision_strategy = BasicStrategy::new();
     let betting_strategy = MarginBettingStrategy::new(3.0, 5);
     let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
-    let mut player = PlayerSim::new(500.0, strategy);
+    let mut player = PlayerSim::new(500.0, strategy, true);
     let mut table = <BlackjackTableSim as BlackjackTable<
         PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     >>::new(f32::MAX, 6, 7);

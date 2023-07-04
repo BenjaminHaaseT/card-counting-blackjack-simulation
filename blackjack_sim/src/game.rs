@@ -267,7 +267,7 @@ mod test {
         let decision_strategy = BasicStrategy::new();
         let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
         let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
-        let player = PlayerSim::new(500.0, strategy);
+        let player = PlayerSim::new(500.0, strategy, true);
         let table = <BlackjackTableSim as BlackjackTable<
             PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
         >>::new(f32::MAX, 6, 7);

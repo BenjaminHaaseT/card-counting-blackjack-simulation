@@ -20,7 +20,7 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> HashMap<usi
 }
 
 /// A public function to take in data i.e. `summary` a `SimulationSummary` object and write it to a writer
-pub fn write(
+pub fn write_summaries(
     receiver: Receiver<(Option<SimulationSummary>, usize)>,
     mut ids: HashSet<usize>,
     mut writer: impl Write,

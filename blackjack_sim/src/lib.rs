@@ -124,8 +124,9 @@ impl<S: Strategy> BlackjackSimulator<S> {
         min_bet: u32,
         hands_per_simulation: u32,
         silent: bool,
+        surrender: bool,
     ) -> Self {
-        let player = PlayerSim::new(player_starting_balance, strategy);
+        let player = PlayerSim::new(player_starting_balance, strategy, surrender);
         let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
             table_starting_balance,
             num_decks,
@@ -290,7 +291,7 @@ impl MulStrategyBlackjackSimulator {
 
         // Spawn thread for writing recorded information
         let write_handle =
-            thread::spawn(move || write::write(write_receiver, ids, std::io::stdout()));
+            thread::spawn(move || write::write_summaries(write_receiver, ids, std::io::stdout()));
 
         while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver
@@ -359,6 +360,7 @@ impl MulStrategyBlackjackSimulatorBuilder {
             self.config.min_bet,
             self.config.hands_per_simulation,
             self.config.silent,
+            self.config.surrender,
         ));
         if let Some(ref mut sim_vec) = self.simulations {
             sim_vec.push(simulation);
@@ -388,6 +390,7 @@ pub struct BlackjackSimulatorConfig {
     pub min_bet: u32,
     pub hands_per_simulation: u32,
     pub silent: bool,
+    pub surrender: bool,
 }
 
 impl BlackjackSimulatorConfig {
@@ -404,6 +407,7 @@ impl BlackjackSimulatorConfig {
             min_bet: None,
             hands_per_simulation: None,
             silent: None,
+            surrender: None,
         }
     }
 }
@@ -425,6 +429,7 @@ pub struct BlackjackSimulatorConfigBuilder {
     min_bet: Option<u32>,
     hands_per_simulation: Option<u32>,
     silent: Option<bool>,
+    surrender: Option<bool>,
 }
 
 impl BlackjackSimulatorConfigBuilder {
@@ -477,6 +482,12 @@ impl BlackjackSimulatorConfigBuilder {
         self
     }
 
+    /// Method for setting a flag that determines if the game allows surrender or not
+    pub fn surrender(&mut self, surrender: bool) -> &mut Self {
+        self.surrender = Some(surrender);
+        self
+    }
+
     /// Method for building a `BlackjackSimulatorCofig` object from the given `BlackjackSimulatorConfigBuilder` object.
     pub fn build(&mut self) -> BlackjackSimulatorConfig {
         BlackjackSimulatorConfig {
@@ -488,6 +499,7 @@ impl BlackjackSimulatorConfigBuilder {
             min_bet: self.min_bet.unwrap_or(5),
             hands_per_simulation: self.hands_per_simulation.unwrap_or(50),
             silent: self.silent.unwrap_or(true),
+            surrender: self.surrender.unwrap_or(true),
         }
     }
 }
@@ -509,8 +521,18 @@ mod tests {
         let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
         let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
 
-        let mut simulator =
-            BlackjackSimulator::new(strategy, 500.0, f32::MAX, 50, 6, 7, MIN_BET, 400, false);
+        let mut simulator = BlackjackSimulator::new(
+            strategy,
+            500.0,
+            f32::MAX,
+            50,
+            6,
+            7,
+            MIN_BET,
+            400,
+            false,
+            true,
+        );
 
         if let Err(e) = simulator.run() {
             panic!("error: {}", e);
