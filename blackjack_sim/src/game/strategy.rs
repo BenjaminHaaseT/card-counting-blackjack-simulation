@@ -14,8 +14,9 @@ pub mod prelude {
 
 pub use prelude::*;
 
-/// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and or place a bet.
-/// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`.
+/// Struct for encapsulating all the necessary information for a struct that implements `Strategy` to make a decsion and/or place a bet.
+/// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`. This struct is essentially, a vector of all
+/// relevant information at each point in the game that a player would want to derive a playing decision from, whether that decision is how much to place their bet or whether to hit/stand etc...
 pub struct TableState<'a> {
     hand: &'a Vec<Arc<Card>>,
     hand_value: &'a Vec<u8>,
@@ -28,6 +29,7 @@ pub struct TableState<'a> {
 }
 
 impl<'a> TableState<'a> {
+    /// Associated method for creating a new `TableState` object.
     fn new(
         hand: &'a Vec<Arc<Card>>,
         hand_value: &'a Vec<u8>,
@@ -51,6 +53,27 @@ impl<'a> TableState<'a> {
     }
 }
 
+/// Struct that ecapsulates all relevant information for placing a bet. Analogous to `TableState` i.e. is essentially a vector whose components are made up of
+/// all the potentially relevant information a betting scheme needs to take into account in order to place an optimal bet.
+pub struct BetState {
+    balance: f32,
+    running_count: f32,
+    true_count: f32,
+    num_decks: u32,
+}
+
+impl BetState {
+    /// Associated method for creating a new 'BetState` object.
+    fn new(balance: f32, running_count: f32, true_count: f32, num_decks: u32) -> BetState {
+        BetState {
+            balance,
+            running_count,
+            true_count,
+            num_decks,
+        }
+    }
+}
+
 /// Trait for a generic decision strategy. Has only one required method `decide_option()`,
 /// the method that will take in the current state of the table i.e. the dealers face upcard and the state of the player and return a decsion.
 /// Allows for composibility and customizability for specific card counting strategies.
@@ -68,7 +91,8 @@ pub trait DecisionStrategy {
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
 pub trait BettingStrategy {
-    fn bet(&self, running_count: f32, true_count: f32, balance: f32) -> u32;
+    /// Required method, takes `state` a `TableState` object and returns the appropriate bet value determined by the implemented strategy.
+    fn bet(&self, state: BetState) -> u32;
 }
 
 /// Trait for a specific counting srategy. Can be implemented by any object that can be used to implement a counting strategy
@@ -86,7 +110,32 @@ pub trait CountingStrategy {
     fn reset(&mut self);
     fn running_count(&self) -> f32;
     fn true_count(&self) -> f32;
+    fn num_decks(&self) -> u32;
     fn name(&self) -> String;
+}
+
+/// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
+pub trait Strategy {
+    // fn new() -> Self;
+    fn bet<'a>(&self, state: BetState) -> u32;
+    fn decide_option<'a>(
+        &self,
+        current_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError>;
+    fn reset(&mut self);
+    fn update(&mut self, card: Arc<Card>);
+    fn get_current_bet_state(&self, balance: f32) -> BetState;
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a>;
+    /// Method for getting a lable that decsribes this strategy
+    fn label(&self) -> String;
 }
 
 /// Struct that encapsulates the logic needed for a simple margin based betting strategy, i.e. for each positive value that the true count takes it will compute the bet as
@@ -105,15 +154,15 @@ impl MarginBettingStrategy {
 
 impl BettingStrategy for MarginBettingStrategy {
     /// Returns the bet based on the true count, if the true count is greater than zero the product of the true count minimum bet and the margin is returned
-    fn bet(&self, running_count: f32, true_count: f32, balance: f32) -> u32 {
-        if true_count > 0.0 {
-            let scalar = f32::ceil(true_count);
+    fn bet(&self, state: BetState) -> u32 {
+        if state.true_count > 0.0 {
+            let scalar = f32::ceil(state.true_count);
             u32::min(
-                balance as u32,
+                state.balance as u32,
                 ((self.min_bet as f32) * scalar * self.margin) as u32,
             )
         } else {
-            u32::min(balance as u32, self.min_bet)
+            u32::min(state.balance as u32, self.min_bet)
         }
     }
 }
@@ -328,6 +377,203 @@ impl DecisionStrategy for BasicStrategy {
     }
 }
 
+/// A struct for implementing S17 playing deviations i.e. the deviations that take into account the running/true count for deriving playing decisions.
+/// S17 stands for game implementations where the dealer stands on soft 17's, hence this struct will make playing decisions under the assumption that dealers will stand
+/// on all hands with a value of 17.
+pub struct S17DeviationStrategy {
+    hard_totals: HashMap<(u8, u8), String>,
+    soft_totals: HashMap<(u8, u8), String>,
+    pair_totals: HashMap<(u8, u8), String>,
+    surrender: HashMap<(u8, u8), String>,
+}
+
+impl S17DeviationStrategy {
+    fn new() -> Self {
+        let (hard_totals, soft_totals, pair_totals, surrender) =
+            BasicStrategy::build_lookup_tables();
+        S17DeviationStrategy {
+            hard_totals,
+            soft_totals,
+            pair_totals,
+            surrender,
+        }
+    }
+}
+
+impl DecisionStrategy for S17DeviationStrategy {
+    /// Method for deciding how to play ones hand according to s17 deviations.
+    /// Essentially implements basic strategy with a few extra checks that may be advantageous to the player if they deviated.
+    fn decide_option<'a>(
+        &self,
+        decision_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError> {
+        let mut option = String::new();
+        let dealers_card = decision_state.dealers_up_card.val;
+
+        // First check if we should surrender or not
+        if options.contains("surrender") {
+            if decision_state.hand_value.len() == 1 {
+                if decision_state.hand_value[0] == 16 {
+                    option.push_str("surrender");
+                } else if decision_state.hand_value[0] == 15
+                    && dealers_card == 10
+                    && f32::ceil(decision_state.running_count) >= 0.0
+                {
+                    option.push_str("surrender");
+                } else if decision_state.hand_value[0] == 15
+                    && dealers_card == 1
+                    && f32::floor(decision_state.true_count) >= 2.0
+                {
+                    option.push_str("surrender");
+                }
+            } else {
+                if decision_state.hand_value[0] == 16 || decision_state.hand_value[1] == 16 {
+                    option.push_str("surrender");
+                } else if (decision_state.hand_value[0] == 15 || decision_state.hand_value[1] == 15)
+                    && dealers_card == 10
+                    && f32::ceil(decision_state.running_count) >= 0.0
+                {
+                    option.push_str("surrender");
+                } else if (decision_state.hand_value[0] == 15 || decision_state.hand_value[1] == 15)
+                    && dealers_card == 1
+                    && f32::floor(decision_state.true_count) >= 2.0
+                {
+                    option.push_str("surrender");
+                }
+            }
+        }
+
+        // Check splitting conditions
+        if option.is_empty() && options.contains("split") {
+            // First check the deviations
+            if decision_state.hand[0].val == 10 && decision_state.hand[1].val == 10 {
+                // Check the deviations, if we dont have any conditions met to deviate we should not split at all
+                // Therefore we can skip checking the basic strategy lookup table
+                let true_count = f32::floor(decision_state.true_count);
+                if (true_count >= 6.0 && dealers_card == 4)
+                    || (true_count >= 5.0 && dealers_card == 5)
+                    || (true_count >= 4.0 && dealers_card == 6)
+                {
+                    option.push_str("split");
+                }
+            } else {
+                // Check basic strategy lookup table
+                if let Some(o) = self
+                    .pair_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    if o == "split" {
+                        option.push_str(o);
+                    }
+                }
+            }
+        }
+
+        // Check if players hand is a soft total and we have not made a decision yet
+        if option.is_empty()
+            && decision_state.hand_value.len() == 2
+            && decision_state.hand_value[1] <= 21
+        {
+            // Check if we should deviate first
+            if (decision_state.hand[0].val == 1 && decision_state.hand[1].val == 8)
+                || (decision_state.hand[0].val == 8 && decision_state.hand[1].val == 1)
+            {
+                let true_count = f32::floor(decision_state.true_count);
+                if dealers_card == 4 && true_count >= 3.0 {
+                    option.push_str("hit");
+                } else if (dealers_card == 5 || dealers_card == 6) && true_count >= 1.0 {
+                    option.push_str("hit");
+                } else {
+                    option.push_str("stand");
+                }
+            } else {
+                if let Some(opt) = self
+                    .soft_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    if options.contains(opt.as_str()) {
+                        option.push_str(opt.as_str());
+                    } else if opt == "double down" && !options.contains("double down") {
+                        option.push_str("hit");
+                    } else {
+                        return Err(BlackjackGameError {
+                            message: format!("option chosen: {}, not available for valid options {:?} with soft total of {}", opt, options, decision_state.hand_value[0])
+                        });
+                    }
+                }
+            }
+        }
+
+        // Otherwise we have a hard total hand, check deviations
+        if option.is_empty() {
+            let (running_count, true_count) = (
+                f32::floor(decision_state.running_count),
+                f32::floor(decision_state.true_count),
+            );
+            if decision_state.hand_value[0] == 16 {
+                if (dealers_card == 9 && true_count >= 4.0)
+                    || (dealers_card == 10 && running_count > 0.0)
+                {
+                    option.push_str("stand");
+                }
+            } else if decision_state.hand_value[0] == 15 {
+                if dealers_card == 10 && true_count >= 4.0 {
+                    option.push_str("stand");
+                }
+            } else if decision_state.hand_value[0] == 13 && true_count <= -1.0 {
+                option.push_str("hit");
+            } else if decision_state.hand_value[0] == 12 {
+                if (dealers_card == 2 && true_count >= 3.0)
+                    || (dealers_card == 3 && true_count >= 2.0)
+                {
+                    option.push_str("stand");
+                } else if dealers_card == 4 && running_count < 0.0 {
+                    option.push_str("hit");
+                }
+            } else if decision_state.hand_value[0] == 11 && dealers_card == 1 && true_count >= 1.0 {
+                option.push_str("hit");
+            } else if decision_state.hand_value[0] == 10 {
+                if (dealers_card == 10 || dealers_card == 1) && true_count >= 4.0 {
+                    option.push_str("double down");
+                }
+            } else if decision_state.hand_value[0] == 9 {
+                if (dealers_card == 2 && true_count >= 1.0)
+                    || (dealers_card == 7 && true_count >= 3.0)
+                {
+                    option.push_str("double down");
+                }
+            }
+
+            // If we havent meet conditions for a deviation, just play basic strategy
+            if option.is_empty() {
+                match self
+                    .hard_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
+                    Some(o) if o == "double down" && !options.contains("double down") => {
+                        option.push_str("hit");
+                    }
+                    _ => {
+                        return Err(BlackjackGameError {
+                            message: "option {o} not a valid choice".to_string(),
+                        })
+                    }
+                }
+            }
+        }
+
+        if option.is_empty() {
+            return Err(BlackjackGameError {
+                message: "no valid option was selected".to_string(),
+            });
+        }
+
+        Ok(option)
+    }
+}
+
 pub struct HiLo {
     running_count: i32,
     true_count: f32,
@@ -393,6 +639,10 @@ impl CountingStrategy for HiLo {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -498,6 +748,10 @@ impl CountingStrategy for WongHalves {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn name(&self) -> String {
         String::from("Wong Halves")
     }
@@ -543,6 +797,10 @@ impl CountingStrategy for KO {
     /// Getter for the running count.
     fn running_count(&self) -> f32 {
         self.running_count as f32
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     /// Method that takes data about the current state of the table and returns a `TableState` object that holds all relevant information for a player to make a decision
@@ -644,6 +902,10 @@ impl CountingStrategy for HiOptI {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.total_cards_counted = 0;
@@ -722,6 +984,10 @@ impl CountingStrategy for HiOptII {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -811,6 +1077,10 @@ impl CountingStrategy for RedSeven {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.true_count = 0.0;
@@ -888,6 +1158,10 @@ impl CountingStrategy for OmegaII {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.true_count = 0.0;
@@ -958,6 +1232,10 @@ impl CountingStrategy for AceFive {
 
     fn true_count(&self) -> f32 {
         self.running_count()
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -1033,6 +1311,10 @@ impl CountingStrategy for ZenCount {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -1112,6 +1394,10 @@ impl CountingStrategy for Halves {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0.0;
         self.true_count = 0.0;
@@ -1184,6 +1470,10 @@ impl CountingStrategy for KISS {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -1268,6 +1558,10 @@ impl CountingStrategy for KISSII {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.true_count = 0.0;
@@ -1350,6 +1644,10 @@ impl CountingStrategy for KISSIII {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.true_count = 0.0;
@@ -1421,6 +1719,10 @@ impl CountingStrategy for JNoir {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -1495,6 +1797,10 @@ impl CountingStrategy for SilverFox {
 
     fn true_count(&self) -> f32 {
         self.true_count
+    }
+
+    fn num_decks(&self) -> u32 {
+        self.num_decks
     }
 
     fn reset(&mut self) {
@@ -1573,6 +1879,10 @@ impl CountingStrategy for UnbalancedZen2 {
         self.true_count
     }
 
+    fn num_decks(&self) -> u32 {
+        self.num_decks
+    }
+
     fn reset(&mut self) {
         self.running_count = 0;
         self.true_count = 0.0;
@@ -1631,12 +1941,8 @@ where
     D: DecisionStrategy,
     B: BettingStrategy,
 {
-    fn bet(&self, balance: f32) -> u32 {
-        self.betting_strategy.bet(
-            self.counting_strategy.running_count() as f32,
-            self.counting_strategy.true_count(),
-            balance,
-        )
+    fn bet(&self, state: BetState) -> u32 {
+        self.betting_strategy.bet(state)
     }
 
     fn decide_option<'a>(
@@ -1653,6 +1959,15 @@ where
 
     fn update(&mut self, card: Arc<Card>) {
         self.counting_strategy.update(card);
+    }
+
+    fn get_current_bet_state(&self, balance: f32) -> BetState {
+        BetState::new(
+            balance,
+            self.counting_strategy.running_count(),
+            self.counting_strategy.true_count(),
+            self.counting_strategy.num_decks(),
+        )
     }
 
     fn get_current_table_state<'a>(
@@ -1678,27 +1993,27 @@ where
 }
 
 /// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
-pub trait Strategy {
-    // fn new() -> Self;
-    fn bet(&self, balance: f32) -> u32;
-    fn decide_option<'a>(
-        &self,
-        current_state: TableState<'a>,
-        options: HashSet<String>,
-    ) -> Result<String, BlackjackGameError>;
-    fn reset(&mut self);
-    fn update(&mut self, card: Arc<Card>);
-    fn get_current_table_state<'a>(
-        &self,
-        hand: &'a Vec<Arc<Card>>,
-        hand_value: &'a Vec<u8>,
-        bet: u32,
-        balance: f32,
-        dealers_up_card: Arc<Card>,
-    ) -> TableState<'a>;
-    /// Method for getting a lable that decsribes this strategy
-    fn label(&self) -> String;
-}
+// pub trait Strategy {
+//     // fn new() -> Self;
+//     fn bet(&self, balance: f32) -> u32;
+//     fn decide_option<'a>(
+//         &self,
+//         current_state: TableState<'a>,
+//         options: HashSet<String>,
+//     ) -> Result<String, BlackjackGameError>;
+//     fn reset(&mut self);
+//     fn update(&mut self, card: Arc<Card>);
+//     fn get_current_table_state<'a>(
+//         &self,
+//         hand: &'a Vec<Arc<Card>>,
+//         hand_value: &'a Vec<u8>,
+//         bet: u32,
+//         balance: f32,
+//         dealers_up_card: Arc<Card>,
+//     ) -> TableState<'a>;
+//     /// Method for getting a lable that decsribes this strategy
+//     fn label(&self) -> String;
+// }
 
 #[cfg(test)]
 mod test {

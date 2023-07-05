@@ -54,7 +54,8 @@ impl<S: Strategy> PlayerSim<S> {
 
     /// Function for getting an initial bet
     pub fn bet(&mut self) -> Result<u32, BlackjackGameError> {
-        let bet = self.strategy.bet(self.balance);
+        let bet_state = self.strategy.get_current_bet_state(self.balance);
+        let bet = self.strategy.bet(bet_state);
         if bet == 0 {
             return Err(BlackjackGameError::new("out of funds".to_string()));
         }
