@@ -1,7 +1,7 @@
 use blackjack_sim::strategy::{
     AceFive, BasicStrategy, CountingStrategy, Halves, HiLo, HiOptI, HiOptII, JNoir,
-    MarginBettingStrategy, OmegaII, PlayerStrategy, RedSeven, SilverFox, UnbalancedZen2,
-    WongHalves, ZenCount, KISS, KISSII, KISSIII, KO,
+    MarginBettingStrategy, OmegaII, PlayerStrategy, RedSeven, S17DeviationStrategy, SilverFox,
+    UnbalancedZen2, WongHalves, ZenCount, KISS, KISSII, KISSIII, KO,
 };
 
 use blackjack_sim::{
@@ -95,82 +95,82 @@ fn main() -> std::io::Result<()> {
     let mut simulator = MulStrategyBlackjackSimulator::new(config)
         .simulation(PlayerStrategy::new(
             HiLo::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             WongHalves::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             KO::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             RedSeven::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             HiOptI::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             HiOptII::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             AceFive::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             OmegaII::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             ZenCount::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             Halves::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             KISS::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             KISSII::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             KISSIII::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             SilverFox::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             JNoir::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .simulation(PlayerStrategy::new(
             UnbalancedZen2::new(num_decks),
-            BasicStrategy::new(),
+            S17DeviationStrategy::new(),
             MarginBettingStrategy::new(betting_margin, min_bet),
         ))
         .build();

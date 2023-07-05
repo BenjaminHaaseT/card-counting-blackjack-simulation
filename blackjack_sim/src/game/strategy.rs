@@ -117,7 +117,7 @@ pub trait CountingStrategy {
 /// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
 pub trait Strategy {
     // fn new() -> Self;
-    fn bet<'a>(&self, state: BetState) -> u32;
+    fn bet(&self, state: BetState) -> u32;
     fn decide_option<'a>(
         &self,
         current_state: TableState<'a>,
@@ -388,7 +388,7 @@ pub struct S17DeviationStrategy {
 }
 
 impl S17DeviationStrategy {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let (hard_totals, soft_totals, pair_totals, surrender) =
             BasicStrategy::build_lookup_tables();
         S17DeviationStrategy {
@@ -535,13 +535,21 @@ impl DecisionStrategy for S17DeviationStrategy {
                 option.push_str("hit");
             } else if decision_state.hand_value[0] == 10 {
                 if (dealers_card == 10 || dealers_card == 1) && true_count >= 4.0 {
-                    option.push_str("double down");
+                    option.push_str(if options.contains("double down") {
+                        "double down"
+                    } else {
+                        "hit"
+                    });
                 }
             } else if decision_state.hand_value[0] == 9 {
                 if (dealers_card == 2 && true_count >= 1.0)
                     || (dealers_card == 7 && true_count >= 3.0)
                 {
-                    option.push_str("double down");
+                    option.push_str(if options.contains("double down") {
+                        "double down"
+                    } else {
+                        "hit"
+                    });
                 }
             }
 
