@@ -1,5 +1,5 @@
--Add configuration options via command line arguments
--Add way so user can tweak rules of the game i.e add a game config builder such that a user can determine whether or not to have insurance, surrender etc...
+
 -Add illustrious 18 decision strategy
+-Add way so user can tweak rules of the game i.e add a game config builder such that a user can determine whether or not to have insurance, surrender etc...
 -Add a way to create betting/counting strategies w/ macros
 -Create API and a user interface so that game parameters can be tweaked on demand

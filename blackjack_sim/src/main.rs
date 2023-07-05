@@ -13,45 +13,51 @@ use std::fs::File;
 use std::io::Write;
 
 #[derive(Parser)]
+#[command(name = "Card Counting Simulator")]
+#[command(author = "Benjamin Haase")]
+#[command(version = "0.1.0")]
+#[command(
+    about = "Simulates the common card counting strategies, and records/displays the data produced by each simulation"
+)]
 struct Cli {
     /// Optional argument to set the starting balance of the table
-    #[arg(long)]
+    #[arg(short = 't', long, value_name = "TABLE")]
     table_starting_balance: Option<f32>,
 
     /// Optional argument, sets the output file name
-    #[arg(long)]
+    #[arg(short = 'f', long, value_name = "FILE")]
     file_out: Option<std::path::PathBuf>,
 
-    #[arg(long)]
     /// Sets the players starting balance for each simulation
+    #[arg(short = 'p', long, value_name = "PLAYER")]
     player_starting_balance: f32,
 
-    #[arg(long)]
     /// Sets the total number of simulations that will be run
+    #[arg(short = 'n', long, value_name = "SIMULATIONS")]
     num_simulations: u32,
 
-    #[arg(long)]
     /// Sets the number of decks that are used in the blackjack game
+    #[arg(short = 'd', long, value_name = "DECKS")]
     num_decks: usize,
 
-    #[arg(long)]
     /// Determines the maximum number of hands played for any given simulation
+    #[arg(short = 'r', long, value_name = "HANDS")]
     hands_per_simulation: u32,
 
-    #[arg(long)]
     /// Determines the minimum bet required
+    #[arg(short = 'b', long, value_name = "BET")]
     min_bet: u32,
 
     /// Decides whether or not to display output from each simulation run
-    #[arg(long)]
+    #[arg(short = 'g', long, value_name = "SILENT")]
     silent_game: Option<bool>,
 
-    #[arg(long)]
     /// Decides whether surrender is a valid play at the blackjack table
+    #[arg(short = 's', long, value_name = "SURRENDER")]
     surrender: bool,
 
-    #[arg(long)]
     /// Decides the margin to increase bets by
+    #[arg(short = 'm', long, value_name = "MARGIN")]
     betting_margin: Option<f32>,
 }
 
