@@ -133,8 +133,6 @@ impl<S: Strategy> PlayerSim<S> {
         options
     }
 
-    /// Method to check whether or not the player can surrender
-
     /// Returns a boolean, true if the `PlayerSim` instance can split their hand, false otherwise.
     fn can_split(&self) -> bool {
         self.hand.len() < 4

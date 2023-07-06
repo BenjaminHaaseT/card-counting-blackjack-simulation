@@ -125,12 +125,20 @@ impl<S: Strategy> BlackjackSimulator<S> {
         hands_per_simulation: u32,
         silent: bool,
         surrender: bool,
+        soft_seventeen: bool,
     ) -> Self {
         let player = PlayerSim::new(player_starting_balance, strategy, surrender);
-        let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
+        // let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
+        //     table_starting_balance,
+        //     num_decks,
+        //     num_shuffles,
+        //     soft_seventeen,
+        // );
+        let table = BlackjackTableSim::new(
             table_starting_balance,
             num_decks,
             num_shuffles,
+            soft_seventeen,
         );
         let game = BlackjackGameSim::new(table, player, hands_per_simulation, min_bet);
         Self {
@@ -364,6 +372,7 @@ impl MulStrategyBlackjackSimulatorBuilder {
             self.config.hands_per_simulation,
             self.config.silent,
             self.config.surrender,
+            self.config.soft_seventeen,
         ));
         if let Some(ref mut sim_vec) = self.simulations {
             sim_vec.push(simulation);
@@ -394,6 +403,7 @@ pub struct BlackjackSimulatorConfig {
     pub hands_per_simulation: u32,
     pub silent: bool,
     pub surrender: bool,
+    pub soft_seventeen: bool,
 }
 
 impl BlackjackSimulatorConfig {
@@ -411,6 +421,7 @@ impl BlackjackSimulatorConfig {
             hands_per_simulation: None,
             silent: None,
             surrender: None,
+            soft_seventeen: None,
         }
     }
 }
@@ -434,6 +445,7 @@ pub struct BlackjackSimulatorConfigBuilder {
     hands_per_simulation: Option<u32>,
     silent: Option<bool>,
     surrender: Option<bool>,
+    soft_seventeen: Option<bool>,
 }
 
 impl BlackjackSimulatorConfigBuilder {
@@ -492,6 +504,12 @@ impl BlackjackSimulatorConfigBuilder {
         self
     }
 
+    /// Method for setting the flag that determines if the dealer must hit soft seventeens, default is false
+    pub fn soft_seventeen(&mut self, seventeen: bool) -> &mut Self {
+        self.soft_seventeen = Some(seventeen);
+        self
+    }
+
     /// Method for building a `BlackjackSimulatorCofig` object from the given `BlackjackSimulatorConfigBuilder` object.
     pub fn build(&mut self) -> BlackjackSimulatorConfig {
         BlackjackSimulatorConfig {
@@ -504,6 +522,7 @@ impl BlackjackSimulatorConfigBuilder {
             hands_per_simulation: self.hands_per_simulation.unwrap_or(50),
             silent: self.silent.unwrap_or(true),
             surrender: self.surrender.unwrap_or(true),
+            soft_seventeen: self.soft_seventeen.unwrap_or(false),
         }
     }
 }
@@ -536,6 +555,7 @@ mod tests {
             400,
             false,
             true,
+            false,
         );
 
         if let Err(e) = simulator.run() {

@@ -268,9 +268,10 @@ mod test {
         let betting_strategy = MarginBettingStrategy::new(3.0, MIN_BET);
         let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
         let player = PlayerSim::new(500.0, strategy, true);
-        let table = <BlackjackTableSim as BlackjackTable<
-            PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
-        >>::new(f32::MAX, 6, 7);
+        // let table = <BlackjackTableSim as BlackjackTable<
+        //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
+        // >>::new(f32::MAX, 6, 7);
+        let table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
         let mut game = BlackjackGameSim::new(table, player, NUM_HANDS, MIN_BET);
 
         if let Err(e) = game.run() {

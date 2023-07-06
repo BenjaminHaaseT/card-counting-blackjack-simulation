@@ -59,6 +59,10 @@ struct Cli {
     /// Decides the margin to increase bets by
     #[arg(short = 'm', long, value_name = "MARGIN")]
     betting_margin: Option<f32>,
+
+    /// Decides whether or not the dealer hits on soft seventeens
+    #[arg(short = 'e', long, value_name = "SEVENTEEN")]
+    soft_seventeen: Option<bool>,
 }
 
 fn main() -> std::io::Result<()> {
@@ -74,6 +78,7 @@ fn main() -> std::io::Result<()> {
         .min_bet(cli.min_bet)
         .silent(cli.silent_game.unwrap_or(true))
         .surrender(cli.surrender)
+        .soft_seventeen(cli.soft_seventeen.unwrap_or(false))
         .build();
 
     // Get other configurations out of cli

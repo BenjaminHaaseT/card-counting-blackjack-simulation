@@ -80,10 +80,16 @@ pub struct BlackjackTableSim {
     // n_decks: usize,
     n_shuffles: u32,
     deck: DeckSim,
+    soft_seventeen: bool,
 }
 
-impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
-    fn new(starting_balance: f32, n_decks: usize, n_shuffles: u32) -> Self {
+impl BlackjackTableSim {
+    pub fn new(
+        starting_balance: f32,
+        n_decks: usize,
+        n_shuffles: u32,
+        soft_seventeen: bool,
+    ) -> Self {
         let dealers_hand = DealersHandSim::new();
         let deck = DeckSim::new(n_decks);
         BlackjackTableSim {
@@ -94,9 +100,21 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             num_player_blackjacks: 0,
             n_shuffles,
             deck,
+            soft_seventeen,
         }
     }
 
+    /// Helper method for determining whether or not the dealer needs to draw more cards at the end of the hand
+    /// Method panics if the hand value vector does not contain two values i.e. dealer does not have a soft total.
+    fn dealer_draws_soft_total(&self) -> bool {
+        assert!(self.dealers_hand.hand_value.len() == 2);
+        (self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] < 17)
+            || (self.soft_seventeen
+                && (self.dealers_hand.hand_value[0] <= 17 && self.dealers_hand.hand_value[1] <= 17))
+    }
+}
+
+impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
     /// Takes a player and a bet and handles the logic for placing a bet before a hand is dealt
     fn place_bet(
         &self,
@@ -207,7 +225,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             .push(Arc::clone(&self.dealers_hand.hand[1]));
 
         if self.dealers_hand.hand_value.len() == 2 {
-            while self.dealers_hand.hand_value[0] < 17 && self.dealers_hand.hand_value[1] < 17 {
+            while self.dealer_draws_soft_total() {
                 let next_card = self.deck.get_next_card().unwrap();
                 self.dealers_hand.receive_card(Arc::clone(&next_card));
                 self.final_cards.push(next_card);
@@ -332,9 +350,10 @@ fn test_single_hand() {
     let betting_strategy = MarginBettingStrategy::new(3.0, 5);
     let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
     let mut player = PlayerSim::new(500.0, strategy, true);
-    let mut table = <BlackjackTableSim as BlackjackTable<
-        PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
-    >>::new(f32::MAX, 6, 7);
+    // let mut table = <BlackjackTableSim as BlackjackTable<
+    //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
+    // >>::new(f32::MAX, 6, 7);
+    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
 
     // Get the bet from the player and place a bet
     let bet = if let Ok(b) = player.bet() {
@@ -395,9 +414,10 @@ fn test_single_hand_loop() {
     let betting_strategy = MarginBettingStrategy::new(3.0, 5);
     let strategy = PlayerStrategy::new(counting_strategy, decision_strategy, betting_strategy);
     let mut player = PlayerSim::new(500.0, strategy, true);
-    let mut table = <BlackjackTableSim as BlackjackTable<
-        PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
-    >>::new(f32::MAX, 6, 7);
+    // let mut table = <BlackjackTableSim as BlackjackTable<
+    //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
+    // >>::new(f32::MAX, 6, 7);
+    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
 
     // Get bet from player
     let bet = match player.bet() {

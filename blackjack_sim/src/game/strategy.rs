@@ -1,9 +1,5 @@
-// use crate::sim::game::player::PlayerSimState;
-// use crate::sim::game::table::TableState;
-use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-// use std::fmt::Display;
 use std::sync::Arc;
 
 pub mod prelude {
@@ -18,13 +14,21 @@ pub use prelude::*;
 /// Meant as a conveince for reducing the number of arguments passed to methods to a struct that implements `Strategy`. This struct is essentially, a vector of all
 /// relevant information at each point in the game that a player would want to derive a playing decision from, whether that decision is how much to place their bet or whether to hit/stand etc...
 pub struct TableState<'a> {
+    /// The player's current hand
     hand: &'a Vec<Arc<Card>>,
+    /// The player's current hand value
     hand_value: &'a Vec<u8>,
+    /// The player's current bet
     bet: u32,
+    /// The player's current balance
     balance: f32,
+    /// The running count computed from what ever counting strategy the player is using
     running_count: f32,
+    /// The true count computed from what ever counting strategy the player is using
     true_count: f32,
+    /// The number of decks being used in the game
     num_decks: u32,
+    /// The dealers face up card
     dealers_up_card: Arc<Card>,
 }
 
@@ -56,9 +60,13 @@ impl<'a> TableState<'a> {
 /// Struct that ecapsulates all relevant information for placing a bet. Analogous to `TableState` i.e. is essentially a vector whose components are made up of
 /// all the potentially relevant information a betting scheme needs to take into account in order to place an optimal bet.
 pub struct BetState {
+    /// The player's current balance
     balance: f32,
+    /// The running count computed by the players counting strategy
     running_count: f32,
+    /// The true count computed by the player's counting strategy
     true_count: f32,
+    /// The number of decks being used in the game
     num_decks: u32,
 }
 
@@ -1999,29 +2007,6 @@ where
         self.counting_strategy_name.clone()
     }
 }
-
-/// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
-// pub trait Strategy {
-//     // fn new() -> Self;
-//     fn bet(&self, balance: f32) -> u32;
-//     fn decide_option<'a>(
-//         &self,
-//         current_state: TableState<'a>,
-//         options: HashSet<String>,
-//     ) -> Result<String, BlackjackGameError>;
-//     fn reset(&mut self);
-//     fn update(&mut self, card: Arc<Card>);
-//     fn get_current_table_state<'a>(
-//         &self,
-//         hand: &'a Vec<Arc<Card>>,
-//         hand_value: &'a Vec<u8>,
-//         bet: u32,
-//         balance: f32,
-//         dealers_up_card: Arc<Card>,
-//     ) -> TableState<'a>;
-//     /// Method for getting a lable that decsribes this strategy
-//     fn label(&self) -> String;
-// }
 
 #[cfg(test)]
 mod test {
