@@ -23,8 +23,9 @@ fn format_summaries(summaries: HashMap<usize, SimulationSummary>) -> HashMap<usi
 pub fn write_summaries(
     receiver: Receiver<(Option<SimulationSummary>, usize)>,
     mut ids: HashSet<usize>,
-    mut writer: impl Write,
+    writer: impl Write,
 ) -> std::io::Result<()> {
+    let mut writer = std::io::BufWriter::new(writer);
     let mut summaries: HashMap<usize, SimulationSummary> = HashMap::new();
     loop {
         let (cur_summary, id) = receiver.recv().unwrap();

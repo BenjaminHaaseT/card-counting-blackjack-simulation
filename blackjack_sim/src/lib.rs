@@ -32,6 +32,7 @@ impl Display for SimulationSummary {
         const width: usize = 80;
         const text_width: usize = "number of player blackjacks".len() + 20;
         const num_width: usize = width - text_width;
+        let total_hands = self.wins + self.losses + self.pushes;
         let body = format!(
             "{}{}\n\
         {:<text_width$}{:>num_width$}\n\
@@ -39,7 +40,12 @@ impl Display for SimulationSummary {
         {:<text_width$}{:>num_width$}\n\
         {:<text_width$}{:>num_width$.2}\n\
         {:<text_width$}{:>num_width$}\n\
-        {:<text_width$}{:>num_width$}\n",
+        {:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$}\n\
+        {:<text_width$}{:>num_width$.2}\n\
+        {:<text_width$}{:>num_width$.2}\n\
+        {:<text_width$}{:>num_width$.2}\n\
+        {:<text_width$}{:>num_width$.2}\n",
             "strategy: ",
             self.label,
             "hands won",
@@ -54,6 +60,16 @@ impl Display for SimulationSummary {
             self.player_blackjacks,
             "number of early endings",
             self.early_endings,
+            "total hands played",
+            total_hands,
+            "win percentage",
+            (self.wins as f32) / (total_hands as f32),
+            "push percentage",
+            (self.pushes as f32) / (total_hands as f32),
+            "loss percentage",
+            (self.losses as f32) / (total_hands as f32),
+            "average winnings per hand",
+            self.winnings / (total_hands as f32)
         );
         write!(f, "{}", body)
     }

@@ -105,8 +105,12 @@ pub trait BettingStrategy {
 
 /// Trait for a specific counting srategy. Can be implemented by any object that can be used to implement a counting strategy
 pub trait CountingStrategy {
+    /// Associated method for creating a new `CountingStrategy` struct.
     fn new(num_decks: u32) -> Self;
+    /// Method that updates the current strategy, takes `card` as a parameter.
     fn update(&mut self, card: Arc<Card>);
+    /// Returns the current state of the table to the caller, i.e. a new `TableState` that is essentially a vector representing all
+    /// of the relevant information a player would need to determine the most optimal playing strategy.
     fn get_current_table_state<'a>(
         &self,
         hand: &'a Vec<Arc<Card>>,
@@ -115,25 +119,45 @@ pub trait CountingStrategy {
         balance: f32,
         dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
+    /// Resets the current strategy, meant be used when ever the deck gets shuffled or when starting a new game.
     fn reset(&mut self);
+    /// Returns the running count as an `f32` of the counting strategy, it is implemented.
     fn running_count(&self) -> f32;
+    /// Returns the true count as an `f32` of the counting strategy, however it is implemented.
     fn true_count(&self) -> f32;
+    /// Returns the number of decks being used with the counting strategy.
     fn num_decks(&self) -> u32;
+    /// Returns a string representing the name of the strategy.
     fn name(&self) -> String;
 }
 
-/// A trait for creating dynamic strategy trait objects. Use full for when testing multiple strategies against eachother
+/// A trait for creating dynamic strategy trait objects. Usefull for when testing multiple strategies against eachother.
+/// Implements all the needed methods for playing blackjack according to a specific strategy.
 pub trait Strategy {
-    // fn new() -> Self;
+    /// Method that returns the most optimal bet according to the implemented strategy.
+    /// Takes a `BetState` `state` as a parameter and returns the optimal bet as a `u32`.
     fn bet(&self, state: BetState) -> u32;
+
+    /// Method that returns the optimal decision according to the implemented strategy.
+    /// Takes `current_state` a `TableState` struct representing the state of table and `options` a `HashSet` of `String`
+    /// representing all valid options that can currently be taken.
     fn decide_option<'a>(
         &self,
         current_state: TableState<'a>,
         options: HashSet<String>,
     ) -> Result<String, BlackjackGameError>;
+
+    /// Resets the current strategy. The strategy should have the same state when it was instantiated after this method is called.
     fn reset(&mut self);
+
+    /// Updates the current strategy, any strategy should be updated whenever a new card is drawn.
     fn update(&mut self, card: Arc<Card>);
+
+    /// Returns a `BetState` struct that represents all necessary information for taking the optimal decision.
+    /// Takes `balance` as a parameter which represents the current balance of the player that is playing using the strategy.
     fn get_current_bet_state(&self, balance: f32) -> BetState;
+
+    /// Returns a `TableState` struct that represents the state of the table.
     fn get_current_table_state<'a>(
         &self,
         hand: &'a Vec<Arc<Card>>,
@@ -142,7 +166,8 @@ pub trait Strategy {
         balance: f32,
         dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
-    /// Method for getting a lable that decsribes this strategy
+
+    /// Method for getting a label that decsribes this strategy
     fn label(&self) -> String;
 }
 
