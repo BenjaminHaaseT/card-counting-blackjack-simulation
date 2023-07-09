@@ -1,4 +1,4 @@
--Add percentage of wins/pushes/losses and total number of hands played to output
+
 -Add option for insurance to game configs
 -Add H17 playing deviations
 
