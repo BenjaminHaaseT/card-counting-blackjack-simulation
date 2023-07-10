@@ -13,6 +13,7 @@ pub struct PlayerSim<S: Strategy> {
     pub bets_log: HashMap<usize, f32>,
     hand_idx: usize,
     pub balance: f32,
+    pub insurance_bet: Option<(f32, bool)>,
     strategy: S,
     surrender_flag: bool,
 }
@@ -27,6 +28,7 @@ impl<S: Strategy> PlayerSim<S> {
             bets_log: HashMap::new(),
             hand_idx: 0,
             balance: starting_balance,
+            insurance_bet: None,
             strategy,
             surrender_flag,
         }
@@ -301,6 +303,26 @@ impl<S: Strategy> PlayerSim<S> {
         }
     }
 
+    /// Method that checks whether the player has currently taken an insurance bet
+    pub fn has_insurance_bet(&self) -> bool {
+        self.insurance_bet.is_some()
+    }
+
+    /// Method that marks insurance bet as `won`
+    pub fn win_insurance(&mut self) {
+        assert!(self.has_insurance_bet());
+        let (bet, _) = self.insurance_bet.take().unwrap();
+        self.insurance_bet = Some((bet, true));
+    }
+
+    /// Method that decides whether or not to take insurance based on the players current strategy, will set the current
+    pub fn take_insurance(&mut self) {
+        // If strategy decides to take insurance, place the insurance bet
+        if self.strategy.take_insurance() {
+            self.insurance_bet = Some((self.get_current_bet() as f32 / 2.0, false));
+        }
+    }
+
     pub fn get_optimal_hands(&mut self) -> Option<Vec<(usize, u32, u8)>> {
         let res = self
             .bets
@@ -346,6 +368,7 @@ impl<S: Strategy> PlayerSim<S> {
         self.bets.clear();
         self.bets_log.clear();
         self.hand_idx = 0;
+        self.insurance_bet = None;
     }
 }
 

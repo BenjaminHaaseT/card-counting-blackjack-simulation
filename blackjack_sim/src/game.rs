@@ -271,7 +271,7 @@ mod test {
         // let table = <BlackjackTableSim as BlackjackTable<
         //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
         // >>::new(f32::MAX, 6, 7);
-        let table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
+        let table = BlackjackTableSim::new(f32::MAX, 6, 7, false, false);
         let mut game = BlackjackGameSim::new(table, player, NUM_HANDS, MIN_BET);
 
         if let Err(e) = game.run() {

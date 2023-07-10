@@ -63,6 +63,10 @@ struct Cli {
     /// Decides whether or not the dealer hits on soft seventeens
     #[arg(short = 'e', long, value_name = "SEVENTEEN")]
     soft_seventeen: Option<bool>,
+
+    /// Decides whether or not the game allows insurance bets to be taken
+    #[arg(short = 'i', long, value_name = "INSURANCE")]
+    insurance: Option<bool>,
 }
 
 fn main() -> std::io::Result<()> {
@@ -79,6 +83,7 @@ fn main() -> std::io::Result<()> {
         .silent(cli.silent_game.unwrap_or(true))
         .surrender(cli.surrender)
         .soft_seventeen(cli.soft_seventeen.unwrap_or(false))
+        .insurance(cli.insurance.unwrap_or(false))
         .build();
 
     // Get other configurations out of cli

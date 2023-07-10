@@ -81,6 +81,7 @@ pub struct BlackjackTableSim {
     n_shuffles: u32,
     deck: DeckSim,
     soft_seventeen: bool,
+    insurance: bool,
 }
 
 impl BlackjackTableSim {
@@ -89,6 +90,7 @@ impl BlackjackTableSim {
         n_decks: usize,
         n_shuffles: u32,
         soft_seventeen: bool,
+        insurance: bool,
     ) -> Self {
         let dealers_hand = DealersHandSim::new();
         let deck = DeckSim::new(n_decks);
@@ -101,6 +103,7 @@ impl BlackjackTableSim {
             n_shuffles,
             deck,
             soft_seventeen,
+            insurance,
         }
     }
 
@@ -138,8 +141,6 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         assert!(!player.bets.is_empty());
 
         if self.deck.shuffle_flag {
-            // For debugging purposes eventually remove this
-            // println!("Shuffling...");
             self.deck.shuffle(self.n_shuffles);
             player.reset_strategy();
         }
@@ -162,9 +163,22 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
         cur_card = self.deck.get_next_card().unwrap();
         self.dealers_hand.receive_card(cur_card);
 
+        // Check for insurance bet conditions
+        if self.insurance
+            && self.dealers_hand.hand[0].rank == "A"
+            && self.balance >= player.get_current_bet() as f32
+        {
+            // Player decides to take or not to take the insurance bet here
+            player.take_insurance();
+        }
+
         // Check for a blackjack, if the dealer has a blackjack we need to check whether the player has a blackjack or not as well
         // in addition we need to update the players strategy, i.e. the counting strategy
         if self.dealers_hand.has_blackjack() {
+            // Check if player has insurance, if so mark insurance bet as payable
+            if self.insurance && player.has_insurance_bet() {
+                player.win_insurance();
+            }
             player.update_strategy(Some(&self.dealers_hand.hand[1]));
             if player.has_blackjack() {
                 player.push_current_hand();
@@ -280,6 +294,7 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
                 }
             }
         }
+
         // Update the players strategy
         player.update_strategy(self.final_cards.iter());
 
@@ -296,6 +311,21 @@ impl<S: Strategy> BlackjackTable<PlayerSim<S>> for BlackjackTableSim {
             } else {
                 hands_pushed += 1;
             }
+        }
+
+        if self.insurance && player.has_insurance_bet() {
+            match player.insurance_bet {
+                Some((bet, flag)) if flag => {
+                    self.balance -= bet;
+                    winnings += 2.0 * bet;
+                    player.collect_winnings(bet);
+                }
+                Some((bet, flag)) => {
+                    self.balance += bet;
+                    winnings -= bet;
+                }
+                _ => panic!("insurance bet should have been placed"),
+            };
         }
 
         if winnings > 0.0 {
@@ -353,7 +383,7 @@ fn test_single_hand() {
     // let mut table = <BlackjackTableSim as BlackjackTable<
     //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     // >>::new(f32::MAX, 6, 7);
-    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
+    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false, false);
 
     // Get the bet from the player and place a bet
     let bet = if let Ok(b) = player.bet() {
@@ -417,7 +447,7 @@ fn test_single_hand_loop() {
     // let mut table = <BlackjackTableSim as BlackjackTable<
     //     PlayerSim<PlayerStrategy<HiLo, BasicStrategy, MarginBettingStrategy>>,
     // >>::new(f32::MAX, 6, 7);
-    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false);
+    let mut table = BlackjackTableSim::new(f32::MAX, 6, 7, false, false);
 
     // Get bet from player
     let bet = match player.bet() {

@@ -95,6 +95,9 @@ pub trait DecisionStrategy {
         decision_state: TableState<'a>,
         options: HashSet<String>,
     ) -> Result<String, BlackjackGameError>;
+
+    /// Method that return true or false depending whether an insurance bet should be placed or not
+    fn take_insurance(&self, true_count: f32) -> bool;
 }
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
@@ -119,6 +122,7 @@ pub trait CountingStrategy {
         balance: f32,
         dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
+
     /// Resets the current strategy, meant be used when ever the deck gets shuffled or when starting a new game.
     fn reset(&mut self);
     /// Returns the running count as an `f32` of the counting strategy, it is implemented.
@@ -166,6 +170,10 @@ pub trait Strategy {
         balance: f32,
         dealers_up_card: Arc<Card>,
     ) -> TableState<'a>;
+
+    /// Method that decides whether or not to take insurance.
+    /// All necessary information to make the decision should already be contained in the struct that implements the trait.
+    fn take_insurance(&self) -> bool;
 
     /// Method for getting a label that decsribes this strategy
     fn label(&self) -> String;
@@ -408,6 +416,11 @@ impl DecisionStrategy for BasicStrategy {
 
         Ok(option)
     }
+
+    fn take_insurance(&self, true_count: f32) -> bool {
+        // Never take insurance when employing basic strategy
+        false
+    }
 }
 
 /// A struct for implementing S17 playing deviations i.e. the deviations that take into account the running/true count for deriving playing decisions.
@@ -612,6 +625,10 @@ impl DecisionStrategy for S17DeviationStrategy {
         }
 
         Ok(option)
+    }
+
+    fn take_insurance(&self, true_count: f32) -> bool {
+        true_count >= 3.0
     }
 }
 
@@ -2026,6 +2043,11 @@ where
             balance,
             dealers_up_card,
         )
+    }
+
+    fn take_insurance(&self) -> bool {
+        self.decision_strategy
+            .take_insurance(self.counting_strategy.true_count())
     }
 
     fn label(&self) -> String {

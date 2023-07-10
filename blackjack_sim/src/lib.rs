@@ -142,6 +142,7 @@ impl<S: Strategy> BlackjackSimulator<S> {
         silent: bool,
         surrender: bool,
         soft_seventeen: bool,
+        insurance: bool,
     ) -> Self {
         let player = PlayerSim::new(player_starting_balance, strategy, surrender);
         // let table = <BlackjackTableSim as BlackjackTable<PlayerSim<S>>>::new(
@@ -155,6 +156,7 @@ impl<S: Strategy> BlackjackSimulator<S> {
             num_decks,
             num_shuffles,
             soft_seventeen,
+            insurance,
         );
         let game = BlackjackGameSim::new(table, player, hands_per_simulation, min_bet);
         Self {
@@ -389,6 +391,7 @@ impl MulStrategyBlackjackSimulatorBuilder {
             self.config.silent,
             self.config.surrender,
             self.config.soft_seventeen,
+            self.config.insurance,
         ));
         if let Some(ref mut sim_vec) = self.simulations {
             sim_vec.push(simulation);
@@ -420,6 +423,7 @@ pub struct BlackjackSimulatorConfig {
     pub silent: bool,
     pub surrender: bool,
     pub soft_seventeen: bool,
+    pub insurance: bool,
 }
 
 impl BlackjackSimulatorConfig {
@@ -438,6 +442,7 @@ impl BlackjackSimulatorConfig {
             silent: None,
             surrender: None,
             soft_seventeen: None,
+            insurance: None,
         }
     }
 }
@@ -462,6 +467,7 @@ pub struct BlackjackSimulatorConfigBuilder {
     silent: Option<bool>,
     surrender: Option<bool>,
     soft_seventeen: Option<bool>,
+    insurance: Option<bool>,
 }
 
 impl BlackjackSimulatorConfigBuilder {
@@ -526,6 +532,13 @@ impl BlackjackSimulatorConfigBuilder {
         self
     }
 
+    /// Method for setting the flag that determines if the game allows insurance bets to be taken. If insurance is set to true,
+    /// insurance bets are allowed to be placed only if the dealer's up card is an ace.
+    pub fn insurance(&mut self, insurance: bool) -> &mut Self {
+        self.insurance = Some(insurance);
+        self
+    }
+
     /// Method for building a `BlackjackSimulatorCofig` object from the given `BlackjackSimulatorConfigBuilder` object.
     pub fn build(&mut self) -> BlackjackSimulatorConfig {
         BlackjackSimulatorConfig {
@@ -539,6 +552,7 @@ impl BlackjackSimulatorConfigBuilder {
             silent: self.silent.unwrap_or(true),
             surrender: self.surrender.unwrap_or(true),
             soft_seventeen: self.soft_seventeen.unwrap_or(false),
+            insurance: self.insurance.unwrap_or(false),
         }
     }
 }
@@ -571,6 +585,7 @@ mod tests {
             400,
             false,
             true,
+            false,
             false,
         );
 
