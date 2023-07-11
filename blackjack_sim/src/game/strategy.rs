@@ -102,7 +102,7 @@ pub trait DecisionStrategy {
 
 /// Trait for a generic betting strategy. Allows greater composibility and customizeability for any playing strategy.
 pub trait BettingStrategy {
-    /// Required method, takes `state` a `TableState` object and returns the appropriate bet value determined by the implemented strategy.
+    /// Required method, takes `state` a `BetState` object and returns the appropriate bet value determined by the implemented strategy.
     fn bet(&self, state: BetState) -> u32;
 }
 
@@ -180,7 +180,7 @@ pub trait Strategy {
 }
 
 /// Struct that encapsulates the logic needed for a simple margin based betting strategy, i.e. for each positive value that the true count takes it will compute the bet as
-/// `self.min_bet` * `self.margin` * true_count
+/// `self.min_bet` * `self.margin` * ceiling(true_count)
 pub struct MarginBettingStrategy {
     margin: f32,
     min_bet: u32,
@@ -373,6 +373,7 @@ impl DecisionStrategy for BasicStrategy {
         // Check if players hand is a soft total, if so default ot soft totals lookup table
         if option.is_empty()
             && decision_state.hand_value.len() == 2
+            && decision_state.hand_value[0] <= 21
             && decision_state.hand_value[1] <= 21
         {
             if let Some(opt) = self
@@ -430,18 +431,18 @@ pub struct S17DeviationStrategy {
     hard_totals: HashMap<(u8, u8), String>,
     soft_totals: HashMap<(u8, u8), String>,
     pair_totals: HashMap<(u8, u8), String>,
-    surrender: HashMap<(u8, u8), String>,
+    // surrender: HashMap<(u8, u8), String>,
 }
 
 impl S17DeviationStrategy {
     pub fn new() -> Self {
-        let (hard_totals, soft_totals, pair_totals, surrender) =
+        let (hard_totals, soft_totals, pair_totals, _surrender) =
             BasicStrategy::build_lookup_tables();
         S17DeviationStrategy {
             hard_totals,
             soft_totals,
             pair_totals,
-            surrender,
+            // surrender,
         }
     }
 }
@@ -519,6 +520,7 @@ impl DecisionStrategy for S17DeviationStrategy {
         // Check if players hand is a soft total and we have not made a decision yet
         if option.is_empty()
             && decision_state.hand_value.len() == 2
+            && decision_state.hand_value[0] <= 21
             && decision_state.hand_value[1] <= 21
         {
             // Check if we should deviate first
@@ -622,6 +624,206 @@ impl DecisionStrategy for S17DeviationStrategy {
             return Err(BlackjackGameError {
                 message: "no valid option was selected".to_string(),
             });
+        }
+
+        Ok(option)
+    }
+
+    fn take_insurance(&self, true_count: f32) -> bool {
+        true_count >= 3.0
+    }
+}
+
+/// A struct that implements optimal playing deviations when the dealer must hit on soft seventeens
+pub struct H17DeviationStrategy {
+    hard_totals: HashMap<(u8, u8), String>,
+    soft_totals: HashMap<(u8, u8), String>,
+    pair_totals: HashMap<(u8, u8), String>,
+}
+
+impl H17DeviationStrategy {
+    /// Associated method for creating a new `H17DeviationStrategy` instance.
+    pub fn new() -> Self {
+        let (hard_totals, soft_totals, pair_totals, _) = BasicStrategy::build_lookup_tables();
+        H17DeviationStrategy {
+            hard_totals,
+            soft_totals,
+            pair_totals,
+        }
+    }
+}
+
+impl DecisionStrategy for H17DeviationStrategy {
+    fn decide_option<'a>(
+        &self,
+        decision_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError> {
+        let mut option = String::new();
+        let dealers_card = decision_state.dealers_up_card.val;
+
+        // Check for surrender, only when we have a hard total
+        if options.contains("surrender") {
+            if decision_state.hand_value.len() == 1 {
+                if decision_state.hand_value[0] == 17 && dealers_card == 1 {
+                    option.push_str("surrender");
+                } else if decision_state.hand_value[0] == 16 {
+                    option.push_str("surrender")
+                } else if decision_state.hand_value[0] == 15 {
+                    if dealers_card == 10 && decision_state.running_count < 0.0 {
+                        option.push_str("surrender");
+                    } else if dealers_card == 1 && decision_state.true_count >= 1.0 {
+                        option.push_str("surrender");
+                    }
+                }
+            }
+        }
+
+        // Check splitting conditions
+        if option.is_empty() && options.contains("split") {
+            // First check the deviations
+            if decision_state.hand[0].val == 10 && decision_state.hand[1].val == 10 {
+                // Check the deviations, if we dont have any conditions met to deviate we should not split at all
+                // Therefore we can skip checking the basic strategy lookup table
+                let true_count = f32::floor(decision_state.true_count);
+                if (true_count >= 6.0 && dealers_card == 4)
+                    || (true_count >= 5.0 && dealers_card == 5)
+                    || (true_count >= 4.0 && dealers_card == 6)
+                {
+                    option.push_str("split");
+                }
+            } else {
+                // Check basic strategy lookup table
+                if let Some(o) = self
+                    .pair_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    if o == "split" {
+                        option.push_str(o);
+                    }
+                }
+            }
+        }
+
+        // Check soft totals next
+        if option.is_empty()
+            && decision_state.hand_value.len() == 2
+            && decision_state.hand_value[0] <= 21
+            && decision_state.hand_value[1] <= 21
+        {
+            let true_count = f32::floor(decision_state.true_count);
+            if (decision_state.hand[0].val == 1 && decision_state.hand[1].val == 8)
+                || (decision_state.hand[0].val == 8 && decision_state.hand[1].val == 1)
+            {
+                if (true_count >= 3.0 && dealers_card == 4)
+                    || (true_count >= 1.0 && dealers_card == 5)
+                    || (decision_state.running_count < 0.0 && dealers_card == 6)
+                {
+                    option.push_str("hit");
+                }
+            } else if (decision_state.hand[0].val == 1 && decision_state.hand[1].val == 6)
+                || (decision_state.hand[0].val == 6 && decision_state.hand[1].val == 1)
+            {
+                if true_count >= 1.0 && dealers_card == 2 {
+                    option.push_str("stand");
+                }
+            }
+
+            // Now check basic strategy
+            if option.is_empty() {
+                if let Some(opt) = self
+                    .soft_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    if options.contains(opt.as_str()) {
+                        option.push_str(opt.as_str());
+                    } else if opt == "double down" && !options.contains("double down") {
+                        option.push_str("hit");
+                    } else {
+                        return Err(BlackjackGameError {
+                            message: format!("option chosen: {}, not available for valid options {:?} with soft total of {}", opt, options, decision_state.hand_value[0])
+                        });
+                    }
+                }
+            }
+        }
+
+        // Finally check hard totals
+        if option.is_empty() {
+            // Check deviations first
+            let true_count = f32::floor(decision_state.true_count);
+            if decision_state.hand_value[0] == 16 {
+                if (dealers_card == 9 && true_count >= 4.0)
+                    || (dealers_card == 10 && decision_state.running_count > 0.0)
+                    || (dealers_card == 1 && true_count >= 3.0)
+                {
+                    option.push_str("stand");
+                }
+            } else if decision_state.hand_value[0] == 15 {
+                if (dealers_card == 4 && true_count >= 4.0)
+                    || (dealers_card == 1 && true_count >= 5.0)
+                {
+                    option.push_str("stand");
+                }
+            } else if decision_state.hand_value[0] == 13 {
+                if dealers_card == 2 && true_count <= -1.0 {
+                    option.push_str("hit");
+                }
+            } else if decision_state.hand_value[0] == 12 {
+                if (dealers_card == 2 && true_count >= 3.0)
+                    || (dealers_card == 3 && true_count >= 2.0)
+                {
+                    option.push_str("stand");
+                } else if dealers_card == 4 && decision_state.running_count < 0.0 {
+                    option.push_str("hit");
+                }
+            } else if decision_state.hand_value[0] == 10 {
+                if (dealers_card == 10 && true_count >= 4.0)
+                    || (dealers_card == 1 && true_count >= 3.0)
+                {
+                    option.push_str(if options.contains("double down") {
+                        "double down"
+                    } else {
+                        "hit"
+                    });
+                }
+            } else if decision_state.hand_value[0] == 9 {
+                if (dealers_card == 2 && true_count >= 1.0)
+                    || (dealers_card == 7 && true_count >= 3.0)
+                {
+                    option.push_str(if options.contains("double down") {
+                        "double down"
+                    } else {
+                        "hit"
+                    });
+                }
+            } else if decision_state.hand_value[0] == 8 {
+                if dealers_card == 6 && true_count >= 2.0 {
+                    option.push_str(if options.contains("double down") {
+                        "double down"
+                    } else {
+                        "hit"
+                    });
+                }
+            }
+
+            // If we havent meet conditions for a deviation, just play basic strategy
+            if option.is_empty() {
+                match self
+                    .hard_totals
+                    .get(&(decision_state.hand_value[0], dealers_card))
+                {
+                    Some(o) if options.contains(o.as_str()) => option.push_str(o.as_str()),
+                    Some(o) if o == "double down" && !options.contains("double down") => {
+                        option.push_str("hit");
+                    }
+                    _ => {
+                        return Err(BlackjackGameError {
+                            message: "option {o} not a valid choice".to_string(),
+                        })
+                    }
+                }
+            }
         }
 
         Ok(option)
