@@ -15,6 +15,14 @@ use strategy::{
     BasicStrategy, BettingStrategy, DecisionStrategy, HiLo, MarginBettingStrategy, Strategy,
 };
 
+pub mod prelude {
+    pub use super::{
+        strategy::prelude::*, BlackjackSimulation, BlackjackSimulator, BlackjackSimulatorConfig,
+        BlackjackSimulatorConfigBuilder, MulStrategyBlackjackSimulator,
+        MulStrategyBlackjackSimulatorBuilder, SimulationError,
+    };
+}
+
 /// Simple struct for recording all of the interesting data points accumulated during a simulation
 pub struct SimulationSummary {
     pub wins: i32,
@@ -369,6 +377,7 @@ impl MulStrategyBlackjackSimulator {
     }
 }
 
+unsafe impl Send for MulStrategyBlackjackSimulator {}
 /// Struct for building a `MulStrategyBlackjackSimulator` object
 pub struct MulStrategyBlackjackSimulatorBuilder {
     simulations: Option<Vec<Box<dyn BlackjackSimulation>>>,
