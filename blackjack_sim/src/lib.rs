@@ -379,7 +379,7 @@ impl MulStrategyBlackjackSimulator {
 
     /// A method for adding a simulation to the simulator, takes `strategy` and then creates a new simulation which is represented as trait object of type `BlackjackSimulation`,
     ///  the adding it to `self.simulations`.
-    pub fn add_simulation(&mut self, strategy: Box<PlayerStrategyDyn>) {
+    pub fn add_simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) {
         // Create trait object
         let simulation: Box<dyn BlackjackSimulation> = Box::new(BlackjackSimulator::new(
             strategy,
@@ -400,6 +400,7 @@ impl MulStrategyBlackjackSimulator {
 }
 
 unsafe impl Send for MulStrategyBlackjackSimulator {}
+
 /// Struct for building a `MulStrategyBlackjackSimulator` object
 pub struct MulStrategyBlackjackSimulatorBuilder {
     simulations: Option<Vec<Box<dyn BlackjackSimulation>>>,

@@ -50,12 +50,14 @@ struct SimConfig {
 #[derive(Debug)]
 enum UserError {
     InternalError,
+    SimulationCreationError(String),
 }
 
 impl std::fmt::Display for UserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match *self {
             UserError::InternalError => write!(f, "{}", "an internal error occured"),
+            UserError::SimulationCreationError(ref s) => write!(f, "{}", s),
         }
     }
 }
@@ -72,6 +74,7 @@ impl error::ResponseError for UserError {
     fn status_code(&self) -> StatusCode {
         match *self {
             UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
+            UserError::SimulationCreationError(_) => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -80,8 +83,8 @@ impl error::ResponseError for UserError {
 fn create_counting_strategy<S: AsRef<str>>(
     name: S,
     num_decks: u32,
-) -> Result<Box<dyn CountingStrategy + 'static>, &'static str> {
-    let counting_strategy: Box<dyn CountingStrategy> = match name.as_ref() {
+) -> Result<Box<dyn CountingStrategy + Send + 'static>, &'static str> {
+    let counting_strategy: Box<dyn CountingStrategy + Send + 'static> = match name.as_ref() {
         "HiLo" => Box::new(HiLo::new(num_decks)),
         "Wong Halves" => Box::new(WongHalves::new(num_decks)),
         "KO" => Box::new(KO::new(num_decks)),
@@ -107,8 +110,8 @@ fn create_counting_strategy<S: AsRef<str>>(
 /// Helper function to create a decsion strategy i.e. a `DecisionStrategy` trait object at runtime.
 fn create_decision_strategy<S: AsRef<str>>(
     name: S,
-) -> Result<Box<dyn DecisionStrategy + 'static>, &'static str> {
-    let decision_strategy: Box<dyn DecisionStrategy> = match name.as_ref() {
+) -> Result<Box<dyn DecisionStrategy + Send + 'static>, &'static str> {
+    let decision_strategy: Box<dyn DecisionStrategy + Send + 'static> = match name.as_ref() {
         "Basic Strategy" => Box::new(BasicStrategy::new()),
         "S17 Deviations" => Box::new(S17DeviationStrategy::new()),
         "H17 Deviations" => Box::new(H17DeviationStrategy::new()),
@@ -123,8 +126,8 @@ fn create_betting_strategy<S: AsRef<str>>(
     name: S,
     margin: f32,
     min_bet: u32,
-) -> Result<Box<dyn BettingStrategy + 'static>, &'static str> {
-    let betting_strategy: Box<dyn BettingStrategy> = match name.as_ref() {
+) -> Result<Box<dyn BettingStrategy + Send + 'static>, &'static str> {
+    let betting_strategy: Box<dyn BettingStrategy + Send + 'static> = match name.as_ref() {
         "Margin" => Box::new(MarginBettingStrategy::new(margin, min_bet)),
         _ => return Err("betting startegy not recognized"),
     };
@@ -140,17 +143,15 @@ fn create_strategy<S: AsRef<str>>(
     num_decks: u32,
     min_bet: u32,
     margin: f32,
-) -> Result<Box<dyn Strategy + 'static>, &'static str> {
+) -> Result<PlayerStrategyDyn, &'static str> {
     let counting_strategy = create_counting_strategy(counting_strategy, num_decks)?;
     let decision_strategy = create_decision_strategy(decision_strategy)?;
     let betting_strategy = create_betting_strategy(betting_strategy, margin, min_bet)?;
-    Ok(Box::new(
-        PlayerStrategyDyn::new()
-            .counting_strategy(counting_strategy)
-            .decision_strategy(decision_strategy)
-            .betting_strategy(betting_strategy)
-            .build(),
-    ))
+    Ok(PlayerStrategyDyn::new()
+        .counting_strategy(counting_strategy)
+        .decision_strategy(decision_strategy)
+        .betting_strategy(betting_strategy)
+        .build())
 }
 
 /// A handler that will configure, and build a new `MulStrategyBlackjackSimulator` using the given parameters the body of the request
@@ -190,7 +191,7 @@ async fn add_simulation(
             sim_params.betting_margin,
         );
 
-        let strategy = if let Ok(s) = create_strategy(
+        match create_strategy(
             counting_strategy,
             decision_strategy,
             betting_strategy,
@@ -198,9 +199,12 @@ async fn add_simulation(
             min_bet,
             margin,
         ) {
-            simulator.add_simulation(s);
-            return Ok(HttpResponse::Ok().finish());
-        };
+            Ok(s) => {
+                simulator.add_simulation(s);
+                return Ok(HttpResponse::Ok().finish());
+            }
+            Err(msg) => return Err(UserError::SimulationCreationError(msg.to_owned())),
+        }
     }
 
     return Err(UserError::InternalError);

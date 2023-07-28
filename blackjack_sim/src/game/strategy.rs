@@ -2616,9 +2616,9 @@ where
 /// Useful for runtime creation if the overhead cost of using dynamic dispatch is acceptable.
 // #[derive(Debug)]
 pub struct PlayerStrategyDyn {
-    counting_strategy: Box<dyn CountingStrategy + 'static>,
-    decision_strategy: Box<dyn DecisionStrategy + 'static>,
-    betting_strategy: Box<dyn BettingStrategy + 'static>,
+    counting_strategy: Box<dyn CountingStrategy + Send + 'static>,
+    decision_strategy: Box<dyn DecisionStrategy + Send + 'static>,
+    betting_strategy: Box<dyn BettingStrategy + Send + 'static>,
     counting_strategy_name: String,
 }
 
@@ -2686,9 +2686,9 @@ impl Strategy for PlayerStrategyDyn {
 }
 
 pub struct PlayerStrategyDynBuilder {
-    counting_strategy: Option<Box<dyn CountingStrategy + 'static>>,
-    decision_strategy: Option<Box<dyn DecisionStrategy + 'static>>,
-    betting_strategy: Option<Box<dyn BettingStrategy + 'static>>,
+    counting_strategy: Option<Box<dyn CountingStrategy + Send + 'static>>,
+    decision_strategy: Option<Box<dyn DecisionStrategy + Send + 'static>>,
+    betting_strategy: Option<Box<dyn BettingStrategy + Send + 'static>>,
     counting_strategy_name: Option<String>,
 }
 
@@ -2704,7 +2704,7 @@ impl PlayerStrategyDynBuilder {
 
     pub fn counting_strategy(
         &mut self,
-        counting_strategy: Box<dyn CountingStrategy + 'static>,
+        counting_strategy: Box<dyn CountingStrategy + Send + 'static>,
     ) -> &mut Self {
         let name = counting_strategy.name();
         self.counting_strategy_name = Some(name);
@@ -2712,12 +2712,18 @@ impl PlayerStrategyDynBuilder {
         self
     }
 
-    pub fn decision_strategy(&mut self, decision_strategy: Box<dyn DecisionStrategy>) -> &mut Self {
+    pub fn decision_strategy(
+        &mut self,
+        decision_strategy: Box<dyn DecisionStrategy + Send + 'static>,
+    ) -> &mut Self {
         self.decision_strategy = Some(decision_strategy);
         self
     }
 
-    pub fn betting_strategy(&mut self, betting_strategy: Box<dyn BettingStrategy>) -> &mut Self {
+    pub fn betting_strategy(
+        &mut self,
+        betting_strategy: Box<dyn BettingStrategy + Send + 'static>,
+    ) -> &mut Self {
         self.betting_strategy = Some(betting_strategy);
         self
     }
