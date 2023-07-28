@@ -4,6 +4,7 @@ pub mod write;
 use blackjack_lib::{BlackjackTable, Card, Deck};
 pub use game::prelude::*;
 use game::strategy::CountingStrategy;
+use prelude::PlayerStrategyDyn;
 use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::Display;
@@ -378,9 +379,9 @@ impl MulStrategyBlackjackSimulator {
 
     /// A method for adding a simulation to the simulator, takes `strategy` and then creates a new simulation which is represented as trait object of type `BlackjackSimulation`,
     ///  the adding it to `self.simulations`.
-    pub fn add_simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) {
+    pub fn add_simulation(&mut self, strategy: Box<PlayerStrategyDyn>) {
         // Create trait object
-        let simulation = Box::new(BlackjackSimulator::new(
+        let simulation: Box<dyn BlackjackSimulation> = Box::new(BlackjackSimulator::new(
             strategy,
             self.config.player_starting_balance,
             self.config.table_starting_balance,
