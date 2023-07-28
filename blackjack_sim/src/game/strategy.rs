@@ -109,7 +109,7 @@ pub trait BettingStrategy {
 /// Trait for a specific counting srategy. Can be implemented by any object that can be used to implement a counting strategy
 pub trait CountingStrategy {
     /// Associated method for creating a new `CountingStrategy` struct.
-    fn new(num_decks: u32) -> Self;
+    // fn new(num_decks: u32) -> Self;
     /// Method that updates the current strategy, takes `card` as a parameter.
     fn update(&mut self, card: Arc<Card>);
     /// Returns the current state of the table to the caller, i.e. a new `TableState` that is essentially a vector representing all
@@ -842,9 +842,9 @@ pub struct HiLo {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for HiLo {
+impl HiLo {
     /// Associated Method for building a new HiLo counting object
-    fn new(num_decks: u32) -> Self {
+    pub fn new(num_decks: u32) -> Self {
         // Initialize lookup table
         let mut lookup_table = HashMap::new();
         for i in 2..7 {
@@ -864,6 +864,30 @@ impl CountingStrategy for HiLo {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for HiLo {
+    /// Associated Method for building a new HiLo counting object
+    // fn new(num_decks: u32) -> Self {
+    //     // Initialize lookup table
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 2..7 {
+    //         lookup_table.insert(i, 1);
+    //     }
+    //     for i in 7..10 {
+    //         lookup_table.insert(i, 0);
+    //     }
+    //     lookup_table.insert(1, -1);
+    //     lookup_table.insert(10, -1);
+
+    //     HiLo {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -942,8 +966,8 @@ pub struct WongHalves {
     lookup_table: HashMap<u8, f32>,
 }
 
-impl CountingStrategy for WongHalves {
-    fn new(num_decks: u32) -> Self {
+impl WongHalves {
+    pub fn new(num_decks: u32) -> Self {
         // Build lookup table with card values counted according to Wong Halves counting strategy.
         let mut lookup_table = HashMap::new();
         lookup_table.insert(1, -1.0);
@@ -965,6 +989,31 @@ impl CountingStrategy for WongHalves {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for WongHalves {
+    // fn new(num_decks: u32) -> Self {
+    //     // Build lookup table with card values counted according to Wong Halves counting strategy.
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(1, -1.0);
+    //     lookup_table.insert(10, -1.0);
+    //     lookup_table.insert(2, 0.5);
+    //     lookup_table.insert(7, 0.5);
+    //     lookup_table.insert(3, 1.0);
+    //     lookup_table.insert(4, 1.0);
+    //     lookup_table.insert(6, 1.0);
+    //     lookup_table.insert(5, 1.5);
+    //     lookup_table.insert(8, 0.0);
+    //     lookup_table.insert(9, -0.5);
+
+    //     WongHalves {
+    //         running_count: 0.0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn get_current_table_state<'a>(
         &self,
@@ -1024,9 +1073,9 @@ pub struct KO {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for KO {
+impl KO {
     /// Associated method to build a new KO struct
-    fn new(num_decks: u32) -> Self {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 2u8..=7 {
             lookup_table.insert(i, 1);
@@ -1043,6 +1092,27 @@ impl CountingStrategy for KO {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for KO {
+    /// Associated method to build a new KO struct
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 2u8..=7 {
+    //         lookup_table.insert(i, 1);
+    //     }
+    //     lookup_table.insert(8, 0);
+    //     lookup_table.insert(9, 0);
+    //     lookup_table.insert(1, -1);
+    //     lookup_table.insert(10, -1);
+    //     let running_count = 4 - 4 * (num_decks as i32);
+
+    //     KO {
+    //         running_count,
+    //         num_decks,
+    //         lookup_table,
+    //     }
+    // }
 
     /// Update the count for the strategy. Since there is no need to compute true count, we only need to update the running count.
     fn update(&mut self, card: Arc<Card>) {
@@ -1104,8 +1174,8 @@ pub struct HiOptI {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for HiOptI {
-    fn new(num_decks: u32) -> Self {
+impl HiOptI {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         lookup_table.insert(2, 0);
         for i in 3..=6_u8 {
@@ -1125,6 +1195,29 @@ impl CountingStrategy for HiOptI {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for HiOptI {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(2, 0);
+    //     for i in 3..=6_u8 {
+    //         lookup_table.insert(i, 1);
+    //     }
+    //     for i in 7..=9_u8 {
+    //         lookup_table.insert(i, 0);
+    //     }
+    //     lookup_table.insert(1, 0);
+    //     lookup_table.insert(10, -1);
+
+    //     HiOptI {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1187,8 +1280,8 @@ pub struct HiOptII {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for HiOptII {
-    fn new(num_decks: u32) -> Self {
+impl HiOptII {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         lookup_table.insert(2, 1);
         lookup_table.insert(3, 1);
@@ -1209,6 +1302,30 @@ impl CountingStrategy for HiOptII {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for HiOptII {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(2, 1);
+    //     lookup_table.insert(3, 1);
+    //     lookup_table.insert(4, 2);
+    //     lookup_table.insert(5, 2);
+    //     lookup_table.insert(6, 1);
+    //     lookup_table.insert(7, 1);
+    //     lookup_table.insert(8, 0);
+    //     lookup_table.insert(9, 0);
+    //     lookup_table.insert(10, -2);
+    //     lookup_table.insert(1, 0);
+
+    //     HiOptII {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1270,8 +1387,8 @@ pub struct RedSeven {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for RedSeven {
-    fn new(num_decks: u32) -> Self {
+impl RedSeven {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 2..=6_u8 {
             lookup_table.insert(i, -1);
@@ -1290,6 +1407,28 @@ impl CountingStrategy for RedSeven {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for RedSeven {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 2..=6_u8 {
+    //         lookup_table.insert(i, -1);
+    //     }
+    //     for i in 8..=9_u8 {
+    //         lookup_table.insert(i, 0);
+    //     }
+    //     lookup_table.insert(10, -1);
+    //     lookup_table.insert(1, -1);
+
+    //     RedSeven {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         let card_index = match self.lookup_table.get(&card.val) {
@@ -1361,8 +1500,8 @@ pub struct OmegaII {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for OmegaII {
-    fn new(num_decks: u32) -> Self {
+impl OmegaII {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         lookup_table.insert(2, 1);
         lookup_table.insert(3, 1);
@@ -1382,6 +1521,29 @@ impl CountingStrategy for OmegaII {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for OmegaII {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(2, 1);
+    //     lookup_table.insert(3, 1);
+    //     lookup_table.insert(4, 2);
+    //     lookup_table.insert(5, 2);
+    //     lookup_table.insert(6, 2);
+    //     lookup_table.insert(7, 1);
+    //     lookup_table.insert(8, 0);
+    //     lookup_table.insert(9, -1);
+    //     lookup_table.insert(10, -2);
+    //     lookup_table.insert(1, 0);
+    //     OmegaII {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1440,8 +1602,8 @@ pub struct AceFive {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for AceFive {
-    fn new(num_decks: u32) -> Self {
+impl AceFive {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 1..=10_u8 {
             lookup_table.insert(
@@ -1461,6 +1623,29 @@ impl CountingStrategy for AceFive {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for AceFive {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 1..=10_u8 {
+    //         lookup_table.insert(
+    //             i,
+    //             if i == 5 {
+    //                 1
+    //             } else if i == 1 {
+    //                 -1
+    //             } else {
+    //                 0
+    //             },
+    //         );
+    //     }
+    //     AceFive {
+    //         running_count: 0,
+    //         num_decks,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1516,8 +1701,8 @@ pub struct ZenCount {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for ZenCount {
-    fn new(num_decks: u32) -> Self {
+impl ZenCount {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         lookup_table.insert(2, 1);
         lookup_table.insert(3, 1);
@@ -1537,6 +1722,29 @@ impl CountingStrategy for ZenCount {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for ZenCount {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(2, 1);
+    //     lookup_table.insert(3, 1);
+    //     lookup_table.insert(4, 2);
+    //     lookup_table.insert(5, 2);
+    //     lookup_table.insert(6, 2);
+    //     lookup_table.insert(7, 1);
+    //     lookup_table.insert(8, 0);
+    //     lookup_table.insert(9, 0);
+    //     lookup_table.insert(10, -2);
+    //     lookup_table.insert(1, -1);
+    //     ZenCount {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1597,8 +1805,8 @@ pub struct Halves {
     lookup_table: HashMap<u8, f32>,
 }
 
-impl CountingStrategy for Halves {
-    fn new(num_decks: u32) -> Self {
+impl Halves {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         lookup_table.insert(2, 0.5);
         lookup_table.insert(3, 1.0);
@@ -1618,6 +1826,29 @@ impl CountingStrategy for Halves {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for Halves {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     lookup_table.insert(2, 0.5);
+    //     lookup_table.insert(3, 1.0);
+    //     lookup_table.insert(4, 1.0);
+    //     lookup_table.insert(5, 1.5);
+    //     lookup_table.insert(6, 1.0);
+    //     lookup_table.insert(7, 0.5);
+    //     lookup_table.insert(8, 0.0);
+    //     lookup_table.insert(9, -0.5);
+    //     lookup_table.insert(10, -1.0);
+    //     lookup_table.insert(1, -1.0);
+    //     Halves {
+    //         running_count: 0.0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1678,8 +1909,8 @@ pub struct KISS {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for KISS {
-    fn new(num_decks: u32) -> Self {
+impl KISS {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 1..=10u8 {
             match i {
@@ -1696,6 +1927,26 @@ impl CountingStrategy for KISS {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for KISS {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 1..=10u8 {
+    //         match i {
+    //             4..=6 => lookup_table.insert(i, 1),
+    //             10 => lookup_table.insert(i, -1),
+    //             _ => lookup_table.insert(i, 0),
+    //         };
+    //     }
+    //     KISS {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -1756,8 +2007,8 @@ pub struct KISSII {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for KISSII {
-    fn new(num_decks: u32) -> Self {
+impl KISSII {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 4..=10u8 {
             match i {
@@ -1775,6 +2026,27 @@ impl CountingStrategy for KISSII {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for KISSII {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 4..=10u8 {
+    //         match i {
+    //             3..=6 => lookup_table.insert(i, 1),
+    //             7..=9 => lookup_table.insert(i, 0),
+    //             _ => lookup_table.insert(i, -1),
+    //         };
+    //     }
+    //     lookup_table.insert(1, -1);
+    //     KISSII {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         let index = match self.lookup_table.get(&card.val) {
@@ -1842,8 +2114,8 @@ pub struct KISSIII {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for KISSIII {
-    fn new(num_decks: u32) -> Self {
+impl KISSIII {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 3..=10 {
             match i {
@@ -1861,6 +2133,27 @@ impl CountingStrategy for KISSIII {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for KISSIII {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 3..=10 {
+    //         match i {
+    //             3..=7 => lookup_table.insert(i, 1),
+    //             8 | 9 => lookup_table.insert(i, 0),
+    //             _ => lookup_table.insert(i, -1),
+    //         };
+    //     }
+    //     lookup_table.insert(1, -1);
+    //     KISSIII {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         let index = match self.lookup_table.get(&card.val) {
@@ -1928,8 +2221,8 @@ pub struct JNoir {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for JNoir {
-    fn new(num_decks: u32) -> Self {
+impl JNoir {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 1..=10u8 {
             match i {
@@ -1945,6 +2238,25 @@ impl CountingStrategy for JNoir {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for JNoir {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 1..=10u8 {
+    //         match i {
+    //             3..=9 => lookup_table.insert(i, 1),
+    //             _ => lookup_table.insert(i, -2),
+    //         };
+    //     }
+    //     JNoir {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -2005,8 +2317,8 @@ pub struct SilverFox {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for SilverFox {
-    fn new(num_decks: u32) -> Self {
+impl SilverFox {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 1..=10 {
             match i {
@@ -2023,6 +2335,26 @@ impl CountingStrategy for SilverFox {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for SilverFox {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 1..=10 {
+    //         match i {
+    //             2..=7 => lookup_table.insert(i, 1),
+    //             8 => lookup_table.insert(i, 0),
+    //             _ => lookup_table.insert(i, -1),
+    //         };
+    //     }
+    //     SilverFox {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -2083,8 +2415,8 @@ pub struct UnbalancedZen2 {
     lookup_table: HashMap<u8, i32>,
 }
 
-impl CountingStrategy for UnbalancedZen2 {
-    fn new(num_decks: u32) -> Self {
+impl UnbalancedZen2 {
+    pub fn new(num_decks: u32) -> Self {
         let mut lookup_table = HashMap::new();
         for i in 1..=10u8 {
             match i {
@@ -2103,6 +2435,28 @@ impl CountingStrategy for UnbalancedZen2 {
             lookup_table,
         }
     }
+}
+
+impl CountingStrategy for UnbalancedZen2 {
+    // fn new(num_decks: u32) -> Self {
+    //     let mut lookup_table = HashMap::new();
+    //     for i in 1..=10u8 {
+    //         match i {
+    //             2 | 7 => lookup_table.insert(i, 1),
+    //             3..=6 => lookup_table.insert(i, 2),
+    //             8 | 9 => lookup_table.insert(i, 0),
+    //             10 => lookup_table.insert(i, -2),
+    //             _ => lookup_table.insert(i, -1),
+    //         };
+    //     }
+    //     UnbalancedZen2 {
+    //         running_count: 0,
+    //         true_count: 0.0,
+    //         num_decks,
+    //         total_cards_counted: 0,
+    //         lookup_table,
+    //     }
+    // }
 
     fn update(&mut self, card: Arc<Card>) {
         self.running_count += self.lookup_table[&card.val];
@@ -2254,6 +2608,139 @@ where
 
     fn label(&self) -> String {
         self.counting_strategy_name.clone()
+    }
+}
+
+/// A struct that offers the same functionality as a `PlayerSim` except that it can be created at runtime.
+/// Instead of using statically typed `CountingStrategy`, `DecisionStrategy` and `BettingStrategy` it uses trait objects.
+/// Useful for runtime creation if the overhead cost of using dynamic dispatch is acceptable.
+// #[derive(Debug)]
+pub struct PlayerStrategyDyn {
+    counting_strategy: Box<dyn CountingStrategy + 'static>,
+    decision_strategy: Box<dyn DecisionStrategy + 'static>,
+    betting_strategy: Box<dyn BettingStrategy + 'static>,
+    counting_strategy_name: String,
+}
+
+impl PlayerStrategyDyn {
+    pub fn new() -> PlayerStrategyDynBuilder {
+        PlayerStrategyDynBuilder::new()
+    }
+}
+
+impl Strategy for PlayerStrategyDyn {
+    fn bet(&self, state: BetState) -> u32 {
+        self.betting_strategy.bet(state)
+    }
+
+    fn decide_option<'a>(
+        &self,
+        current_state: TableState<'a>,
+        options: HashSet<String>,
+    ) -> Result<String, BlackjackGameError> {
+        self.decision_strategy.decide_option(current_state, options)
+    }
+
+    fn reset(&mut self) {
+        self.counting_strategy.reset();
+    }
+
+    fn update(&mut self, card: Arc<Card>) {
+        self.counting_strategy.update(card);
+    }
+
+    fn get_current_bet_state(&self, balance: f32) -> BetState {
+        BetState::new(
+            balance,
+            self.counting_strategy.running_count(),
+            self.counting_strategy.true_count(),
+            self.counting_strategy.num_decks(),
+        )
+    }
+
+    fn get_current_table_state<'a>(
+        &self,
+        hand: &'a Vec<Arc<Card>>,
+        hand_value: &'a Vec<u8>,
+        bet: u32,
+        balance: f32,
+        dealers_up_card: Arc<Card>,
+    ) -> TableState<'a> {
+        self.counting_strategy.get_current_table_state(
+            hand,
+            hand_value,
+            bet,
+            balance,
+            dealers_up_card,
+        )
+    }
+
+    fn take_insurance(&self) -> bool {
+        self.decision_strategy
+            .take_insurance(self.counting_strategy.true_count())
+    }
+
+    fn label(&self) -> String {
+        self.counting_strategy_name.clone()
+    }
+}
+
+pub struct PlayerStrategyDynBuilder {
+    counting_strategy: Option<Box<dyn CountingStrategy + 'static>>,
+    decision_strategy: Option<Box<dyn DecisionStrategy + 'static>>,
+    betting_strategy: Option<Box<dyn BettingStrategy + 'static>>,
+    counting_strategy_name: Option<String>,
+}
+
+impl PlayerStrategyDynBuilder {
+    pub fn new() -> Self {
+        PlayerStrategyDynBuilder {
+            counting_strategy: None,
+            decision_strategy: None,
+            betting_strategy: None,
+            counting_strategy_name: None,
+        }
+    }
+
+    pub fn counting_strategy(
+        &mut self,
+        counting_strategy: Box<dyn CountingStrategy + 'static>,
+    ) -> &mut Self {
+        let name = counting_strategy.name();
+        self.counting_strategy_name = Some(name);
+        self.counting_strategy = Some(counting_strategy);
+        self
+    }
+
+    pub fn decision_strategy(&mut self, decision_strategy: Box<dyn DecisionStrategy>) -> &mut Self {
+        self.decision_strategy = Some(decision_strategy);
+        self
+    }
+
+    pub fn betting_strategy(&mut self, betting_strategy: Box<dyn BettingStrategy>) -> &mut Self {
+        self.betting_strategy = Some(betting_strategy);
+        self
+    }
+
+    pub fn build(&mut self) -> PlayerStrategyDyn {
+        PlayerStrategyDyn {
+            counting_strategy: self
+                .counting_strategy
+                .take()
+                .expect("counting strategy should be set"),
+            decision_strategy: self
+                .decision_strategy
+                .take()
+                .expect("decision strategy should be set"),
+            betting_strategy: self
+                .betting_strategy
+                .take()
+                .expect("betting strategy should be set"),
+            counting_strategy_name: self
+                .counting_strategy_name
+                .take()
+                .expect("counting strategy name should be set"),
+        }
     }
 }
 

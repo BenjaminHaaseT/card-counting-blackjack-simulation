@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, MutexGuard};
 
 #[derive(Serialize, Deserialize)]
-struct Config {
+struct GameConfig {
     player_starting_balance: f32,
     table_starting_balance: Option<f32>,
     num_simulations: u32,
@@ -21,8 +21,8 @@ struct Config {
     insurance: Option<bool>,
 }
 
-impl From<Config> for BlackjackSimulatorConfig {
-    fn from(value: Config) -> Self {
+impl From<GameConfig> for BlackjackSimulatorConfig {
+    fn from(value: GameConfig) -> Self {
         BlackjackSimulatorConfig::new()
             .player_starting_balance(value.player_starting_balance)
             .table_starting_balance(value.table_starting_balance.unwrap_or(f32::MAX))
@@ -35,6 +35,14 @@ impl From<Config> for BlackjackSimulatorConfig {
             .insurance(value.insurance.unwrap_or(false))
             .build()
     }
+}
+
+/// A struct for deserializing the strategy configuration from json.
+#[derive(Deserialize)]
+struct SimConfig {
+    counting_strategy: String,
+    decision_strategy: String,
+    betting_margin: f32,
 }
 
 /// An enum that will handle user facing errors
@@ -67,22 +75,41 @@ impl error::ResponseError for UserError {
     }
 }
 
+fn add_simulation_helper(simulator: &mut MulStrategyBlackjackSimulator, sim_params: SimConfig) {}
+
 /// A handler that will configure, and build a new `MulStrategyBlackjackSimulator` using the given parameters the body of the request
-#[post("/config-sim-params")]
+#[post("/config-game-params")]
 async fn configure_simulation_parameters(
-    params: web::Json<Config>,
+    params: web::Json<GameConfig>,
     app_sim: web::Data<Mutex<Option<MulStrategyBlackjackSimulator>>>,
 ) -> Result<HttpResponse, UserError> {
     let config = BlackjackSimulatorConfig::from(params.into_inner());
-    let guard = if let Ok(g) = app_sim.lock() {
+    let mut guard = if let Ok(g) = app_sim.lock() {
         g
     } else {
         return Err(UserError::InternalError);
     };
 
-    // TODO: Add a method for adding simulations after simulator has been built i.e. add an add_simulation method.
-    // That way a simulator can be created without having to add all of its simulations up front.
-    *guard = Some(MulStrategyBlackjackSimulator::new(config));
+    *guard = Some(MulStrategyBlackjackSimulator::new(config).build());
+    Ok(HttpResponse::Ok().finish())
+}
+
+#[post("/add-sim")]
+async fn add_simulation(
+    sim_params: web::Json<SimConfig>,
+    app_sim: web::Data<Mutex<Option<MulStrategyBlackjackSimulator>>>,
+) -> Result<HttpResponse, UserError> {
+    let mut guard = if let Ok(g) = app_sim.lock() {
+        g
+    } else {
+        return Err(UserError::InternalError);
+    };
+
+    if let Some(simulator) = guard.as_mut() {
+        // TODO: needs trait object implementation for creating a strategy and then a simulation
+        todo!();
+    }
+
     Ok(HttpResponse::Ok().finish())
 }
 

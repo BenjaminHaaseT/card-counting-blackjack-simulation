@@ -297,7 +297,7 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
 /// game while testing multiple strategies. Tests each strategy in parallel to speed up computation.
 pub struct MulStrategyBlackjackSimulator {
     simulations: Vec<Box<dyn BlackjackSimulation>>,
-    config: BlackjackSimulatorConfig,
+    pub config: BlackjackSimulatorConfig,
 }
 
 impl MulStrategyBlackjackSimulator {
@@ -374,6 +374,27 @@ impl MulStrategyBlackjackSimulator {
         }
 
         Ok(())
+    }
+
+    /// A method for adding a simulation to the simulator, takes `strategy` and then creates a new simulation which is represented as trait object of type `BlackjackSimulation`,
+    ///  the adding it to `self.simulations`.
+    pub fn add_simulation<S: Strategy + Send + 'static>(&mut self, strategy: S) {
+        // Create trait object
+        let simulation = Box::new(BlackjackSimulator::new(
+            strategy,
+            self.config.player_starting_balance,
+            self.config.table_starting_balance,
+            self.config.num_simulations,
+            self.config.num_decks,
+            self.config.num_shuffles,
+            self.config.min_bet,
+            self.config.hands_per_simulation,
+            self.config.silent,
+            self.config.surrender,
+            self.config.soft_seventeen,
+            self.config.insurance,
+        ));
+        self.simulations.push(simulation);
     }
 }
 
