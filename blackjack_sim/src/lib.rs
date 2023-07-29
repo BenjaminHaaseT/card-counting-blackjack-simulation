@@ -20,7 +20,7 @@ pub mod prelude {
     pub use super::{
         strategy::prelude::*, BlackjackSimulation, BlackjackSimulator, BlackjackSimulatorConfig,
         BlackjackSimulatorConfigBuilder, MulStrategyBlackjackSimulator,
-        MulStrategyBlackjackSimulatorBuilder, SimulationError,
+        MulStrategyBlackjackSimulatorBuilder, SimulationError, SimulationSummary,
     };
 }
 
@@ -294,6 +294,18 @@ impl<S: Strategy + Send> BlackjackSimulation for BlackjackSimulator<S> {
     }
 }
 
+/// A type alias for a write function, that we can send to a seperate thread.
+/// Gives flexibility to the process of writing output when simulations are run.
+type WriteFn = Box<
+    dyn Fn(
+            Receiver<(Option<SimulationSummary>, usize)>,
+            HashSet<usize>,
+            Box<dyn Write + Send + 'static>,
+        ) -> std::io::Result<()>
+        + Send
+        + 'static,
+>;
+
 /// This struct is for testing multiple strategies at once, designed to give the use options to customize different parameters of the
 /// game while testing multiple strategies. Tests each strategy in parallel to speed up computation.
 pub struct MulStrategyBlackjackSimulator {
@@ -315,6 +327,7 @@ impl MulStrategyBlackjackSimulator {
     pub fn run(
         &mut self,
         file_out: Box<dyn Write + Send + 'static>,
+        write_fn: WriteFn,
     ) -> Result<(), SimulationError> {
         // Open channel
         let (write_sender, write_receiver) = mpsc::channel::<(Option<SimulationSummary>, usize)>();
@@ -328,8 +341,11 @@ impl MulStrategyBlackjackSimulator {
         let ids = HashSet::from_iter(1..=self.simulations.len());
 
         // Spawn thread for writing recorded information
-        let write_handle =
-            thread::spawn(move || write::write_summaries(write_receiver, ids, file_out));
+        // let write_handle =
+        //     thread::spawn(move || write::write_summaries(write_receiver, ids, file_out));
+
+        // Spawn thread for writing recorded information
+        let write_handle = thread::spawn(move || write_fn(write_receiver, ids, file_out));
 
         while let Some(mut simulation) = self.simulations.pop() {
             // Clone the sender to the write_receiver
@@ -649,7 +665,10 @@ mod tests {
             ))
             .build();
 
-        if let Err(e) = simulator.run(Box::new(std::io::stdout())) {
+        if let Err(e) = simulator.run(
+            Box::new(std::io::stdout()),
+            Box::new(write::write_summaries),
+        ) {
             eprintln!("{}", e);
             panic!();
         }

@@ -6,9 +6,13 @@ use actix_web::{
 };
 use blackjack_sim::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::io::{BufWriter, Write};
+use std::sync::mpsc::Receiver;
 use std::sync::{Mutex, MutexGuard};
 
-#[derive(Serialize, Deserialize)]
+/// A struct for handling the configurations of the game. Meant to be deserialized from JSON.
+#[derive(Deserialize)]
 struct GameConfig {
     player_starting_balance: f32,
     table_starting_balance: Option<f32>,
@@ -51,6 +55,7 @@ struct SimConfig {
 enum UserError {
     InternalError,
     SimulationCreationError(String),
+    SimulatorNotCreated,
 }
 
 impl std::fmt::Display for UserError {
@@ -58,6 +63,11 @@ impl std::fmt::Display for UserError {
         match *self {
             UserError::InternalError => write!(f, "{}", "an internal error occured"),
             UserError::SimulationCreationError(ref s) => write!(f, "{}", s),
+            UserError::SimulatorNotCreated => write!(
+                f,
+                "{}",
+                "unable to add simulation, a simulator has not been created"
+            ),
         }
     }
 }
@@ -75,7 +85,116 @@ impl error::ResponseError for UserError {
         match *self {
             UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             UserError::SimulationCreationError(_) => StatusCode::BAD_REQUEST,
+            UserError::SimulatorNotCreated => StatusCode::BAD_REQUEST,
         }
+    }
+}
+
+/// A struct for collecting simulation `SimulationSummary` data into something that can deserialize into JSON
+#[derive(Serialize)]
+struct SimulationSummaryJson {
+    pub counting_strategy: String,
+    pub wins: i32,
+    pub pushes: i32,
+    pub losses: i32,
+    pub early_endings: i32,
+    pub winnings: f32,
+    pub num_hands: u32,
+    pub player_blackjacks: i32,
+    pub total_hands_played: u32,
+    pub win_pct: f32,
+    pub push_pct: f32,
+    pub lose_pct: f32,
+    pub avg_winnings_per_hand: f32,
+}
+
+impl SimulationSummaryJson {
+    fn new(counting_strategy: String) -> Self {
+        SimulationSummaryJson {
+            counting_strategy,
+            wins: 0,
+            pushes: 0,
+            losses: 0,
+            early_endings: 0,
+            winnings: 0.0,
+            num_hands: 0,
+            player_blackjacks: 0,
+            total_hands_played: 0,
+            win_pct: 0.0,
+            push_pct: 0.0,
+            lose_pct: 0.0,
+            avg_winnings_per_hand: 0.0,
+        }
+    }
+}
+
+unsafe impl Send for SimulationSummaryJson {}
+
+/// A struct for collecting all of the simulation summaries into a format that can be
+#[derive(Serialize)]
+struct SimulationSummaryMap {
+    summaries: HashMap<usize, SimulationSummaryJson>,
+}
+
+impl SimulationSummaryMap {
+    fn new() -> Self {
+        SimulationSummaryMap {
+            summaries: HashMap::new(),
+        }
+    }
+}
+
+unsafe impl Send for SimulationSummaryMap {}
+
+/// A function for writing data that can be passed as a write function to the `MulStrategyBlackjackSimulator` run method.
+fn write_simulation_summary_as_json(
+    receiver: Receiver<(Option<SimulationSummary>, usize)>,
+    mut ids: HashSet<usize>,
+) -> Result<String, UserError> {
+    let mut summaries_map = SimulationSummaryMap::new();
+    // let mut writer = BufWriter::new(writer);
+
+    'outer: loop {
+        match receiver.recv().unwrap() {
+            (Some(cur_summary), id) => {
+                let summary = summaries_map
+                    .summaries
+                    .entry(id)
+                    .or_insert(SimulationSummaryJson::new(cur_summary.label));
+                summary.wins += cur_summary.wins;
+                summary.pushes += cur_summary.pushes;
+                summary.losses += cur_summary.losses;
+                summary.winnings += cur_summary.winnings;
+                summary.player_blackjacks += cur_summary.player_blackjacks;
+                summary.early_endings += cur_summary.early_endings;
+            }
+            (None, id) => {
+                // Remove from ids
+                ids.remove(&id);
+                // Check if we are done processing simulations
+                if ids.is_empty() {
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    // Compute final statistics
+    for (_, v) in &mut summaries_map.summaries {
+        let total_hands_played = v.wins + v.pushes + v.losses;
+        let win_pct = (v.wins as f32) / (total_hands_played as f32);
+        let push_pct = (v.pushes as f32) / (total_hands_played as f32);
+        let lose_pct = (v.losses as f32) / (total_hands_played as f32);
+        let avg_winnings_per_hand = (v.winnings as f32) / (total_hands_played as f32);
+        v.win_pct = win_pct;
+        v.push_pct = push_pct;
+        v.lose_pct = lose_pct;
+        v.avg_winnings_per_hand = avg_winnings_per_hand;
+    }
+
+    match serde_json::to_string(&summaries_map) {
+        Ok(res) => Ok(res),
+        Err(_) => Err(UserError::InternalError),
     }
 }
 
@@ -207,7 +326,7 @@ async fn add_simulation(
         }
     }
 
-    return Err(UserError::InternalError);
+    return Err(UserError::SimulatorNotCreated);
 }
 
 #[actix_web::main]

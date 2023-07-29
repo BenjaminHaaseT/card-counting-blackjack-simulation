@@ -5,8 +5,8 @@ use blackjack_sim::strategy::{
 };
 
 use blackjack_sim::{
-    BlackjackSimulatorConfig, BlackjackSimulatorConfigBuilder, MulStrategyBlackjackSimulator,
-    MulStrategyBlackjackSimulatorBuilder,
+    write::write_summaries, BlackjackSimulatorConfig, BlackjackSimulatorConfigBuilder,
+    MulStrategyBlackjackSimulator, MulStrategyBlackjackSimulatorBuilder,
 };
 use clap::Parser;
 use std::fs::File;
@@ -188,7 +188,7 @@ fn main() -> std::io::Result<()> {
     // Run simulation and check for error
     println!("Running simulations...");
 
-    if let Err(err) = simulator.run(out_writer) {
+    if let Err(err) = simulator.run(out_writer, Box::new(write_summaries)) {
         eprintln!("error: {}", err);
         std::process::exit(1);
     }
