@@ -306,6 +306,17 @@ type WriteFn = Box<
         + 'static,
 >;
 
+/// A type alias for a write function that returns output as a `Result<String, E>`. Gives
+/// flexibility to the process of writing output resulting from simulations
+type WriteFnOut = Box<
+    dyn Fn(
+            Receiver<(Option<SimulationSummary>, usize)>,
+            HashSet<usize>,
+        ) -> Result<String, Box<dyn std::error::Error + Send + 'static>>
+        + Send
+        + 'static,
+>;
+
 /// This struct is for testing multiple strategies at once, designed to give the use options to customize different parameters of the
 /// game while testing multiple strategies. Tests each strategy in parallel to speed up computation.
 pub struct MulStrategyBlackjackSimulator {
@@ -320,6 +331,11 @@ impl MulStrategyBlackjackSimulator {
             simulations: None,
             config: config,
         }
+    }
+
+    /// A public getter that returns an immutable reference to `self.simulations`.
+    pub fn simulations(&self) -> &Vec<Box<dyn BlackjackSimulation>> {
+        &self.simulations
     }
 
     /// The method that will run each of the strategies in a configured simulation. Each strategy gets tested in a new thread,
@@ -339,10 +355,6 @@ impl MulStrategyBlackjackSimulator {
 
         // Create unique id's for each simulation, that way the writing thread knows when one simulation is done
         let ids = HashSet::from_iter(1..=self.simulations.len());
-
-        // Spawn thread for writing recorded information
-        // let write_handle =
-        //     thread::spawn(move || write::write_summaries(write_receiver, ids, file_out));
 
         // Spawn thread for writing recorded information
         let write_handle = thread::spawn(move || write_fn(write_receiver, ids, file_out));
@@ -380,7 +392,7 @@ impl MulStrategyBlackjackSimulator {
 
         for (i, handle) in handles.into_iter().enumerate() {
             if let Err(e) = handle.join().unwrap() {
-                eprintln!("error occured for simulation #{i}");
+                eprintln!("error occured for simulation #{}", i + 1);
                 return Err(e);
             }
         }
@@ -391,6 +403,71 @@ impl MulStrategyBlackjackSimulator {
         }
 
         Ok(())
+    }
+
+    /// A method almost identical to `self.run()` except that it returns the results of the simulation as a `Result<String, dyn Error>`.
+    pub fn run_return_out(
+        &mut self,
+        write_fn: WriteFnOut,
+    ) -> Result<String, Box<dyn std::error::Error + Send + 'static>> {
+        // Open channel
+        let (write_sender, write_receiver) = mpsc::channel::<(Option<SimulationSummary>, usize)>();
+
+        // Collect thread handles
+        let mut handles: Vec<JoinHandle<Result<(), SimulationError>>> = vec![];
+        self.simulations.reverse();
+        let mut id: usize = 1;
+
+        // Create unique Id's for each simulation that way the thread responsible for writing will know when all simulations are finished
+        let ids = HashSet::from_iter(1..=self.simulations.len());
+
+        // spawn thread for writing
+        let write_handle = thread::spawn(move || write_fn(write_receiver, ids));
+
+        // spawn a new thread for each simulation
+        while let Some(mut sim) = self.simulations.pop() {
+            let write_sender_clone = write_sender.clone();
+            let num_simulations = self.config.num_simulations;
+
+            let handle = thread::spawn(move || {
+                for _i in 0..num_simulations {
+                    // Run a single simulation
+                    if let Err(e) = sim.run_single_simulation() {
+                        return Err(SimulationError::GameError(e.message));
+                    }
+                    let simulation_summary = sim.summary();
+                    // Record data, i.e. pass simulation summary to thread responsible for writing
+                    if let Err(e) = write_sender_clone.send((Some(simulation_summary), id)) {
+                        return Err(SimulationError::SendingError(format!("{}", e)));
+                    }
+                    // Reset simulation for next iteration
+                    sim.reset();
+                }
+
+                // Tell writing thread we are finished with this simulation
+                if let Err(e) = write_sender_clone.send((None, id)) {
+                    return Err(SimulationError::SendingError(format!("{}", e)));
+                }
+
+                Ok(())
+            });
+
+            id += 1;
+            handles.push(handle);
+        }
+
+        // Ensure that all handles finish
+        for (i, handle) in handles.into_iter().enumerate() {
+            if let Err(e) = handle.join().unwrap() {
+                eprintln!("an error occured with simulation #{}", i + 1);
+                return Err(Box::new(e));
+            }
+        }
+
+        match write_handle.join().unwrap() {
+            Ok(res) => Ok(res),
+            Err(e) => Err(e),
+        }
     }
 
     /// A method for adding a simulation to the simulator, takes `strategy` and then creates a new simulation which is represented as trait object of type `BlackjackSimulation`,

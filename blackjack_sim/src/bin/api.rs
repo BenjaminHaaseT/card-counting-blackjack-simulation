@@ -12,7 +12,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Mutex, MutexGuard};
 
 /// A struct for handling the configurations of the game. Meant to be deserialized from JSON.
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct GameConfig {
     player_starting_balance: f32,
     table_starting_balance: Option<f32>,
@@ -56,11 +56,12 @@ enum UserError {
     InternalError,
     SimulationCreationError(String),
     SimulatorNotCreated,
+    BadInput(String),
 }
 
 impl std::fmt::Display for UserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match *self {
+        match self {
             UserError::InternalError => write!(f, "{}", "an internal error occured"),
             UserError::SimulationCreationError(ref s) => write!(f, "{}", s),
             UserError::SimulatorNotCreated => write!(
@@ -68,6 +69,7 @@ impl std::fmt::Display for UserError {
                 "{}",
                 "unable to add simulation, a simulator has not been created"
             ),
+            UserError::BadInput(s) => write!(f, "{}", s),
         }
     }
 }
@@ -86,6 +88,7 @@ impl error::ResponseError for UserError {
             UserError::InternalError => StatusCode::INTERNAL_SERVER_ERROR,
             UserError::SimulationCreationError(_) => StatusCode::BAD_REQUEST,
             UserError::SimulatorNotCreated => StatusCode::BAD_REQUEST,
+            UserError::BadInput(_) => StatusCode::BAD_REQUEST,
         }
     }
 }
@@ -150,9 +153,8 @@ unsafe impl Send for SimulationSummaryMap {}
 fn write_simulation_summary_as_json(
     receiver: Receiver<(Option<SimulationSummary>, usize)>,
     mut ids: HashSet<usize>,
-) -> Result<String, UserError> {
+) -> Result<String, Box<dyn std::error::Error + Send + 'static>> {
     let mut summaries_map = SimulationSummaryMap::new();
-    // let mut writer = BufWriter::new(writer);
 
     'outer: loop {
         match receiver.recv().unwrap() {
@@ -194,7 +196,7 @@ fn write_simulation_summary_as_json(
 
     match serde_json::to_string(&summaries_map) {
         Ok(res) => Ok(res),
-        Err(_) => Err(UserError::InternalError),
+        Err(_) => Err(Box::new(UserError::InternalError)),
     }
 }
 
@@ -279,6 +281,7 @@ async fn configure_simulation_parameters(
     params: web::Json<GameConfig>,
     app_sim: web::Data<Mutex<Option<MulStrategyBlackjackSimulator>>>,
 ) -> Result<HttpResponse, UserError> {
+    // let config = params.into_inner();
     let config = BlackjackSimulatorConfig::from(params.into_inner());
     let mut guard = if let Ok(g) = app_sim.lock() {
         g
@@ -287,9 +290,10 @@ async fn configure_simulation_parameters(
     };
 
     *guard = Some(MulStrategyBlackjackSimulator::new(config).build());
-    Ok(HttpResponse::Ok().finish())
+    Ok(HttpResponse::Ok().body("simulator created successfully"))
 }
 
+/// A handler that will add a simulation to the simulator.
 #[post("/add-sim")]
 async fn add_simulation(
     sim_params: web::Json<SimConfig>,
@@ -320,7 +324,7 @@ async fn add_simulation(
         ) {
             Ok(s) => {
                 simulator.add_simulation(s);
-                return Ok(HttpResponse::Ok().finish());
+                return Ok(HttpResponse::Ok().body("simulation added successfully"));
             }
             Err(msg) => return Err(UserError::SimulationCreationError(msg.to_owned())),
         }
@@ -329,7 +333,52 @@ async fn add_simulation(
     return Err(UserError::SimulatorNotCreated);
 }
 
+/// A handler that will run the simulation given the configurations.
+/// Will return an error resposne if the game has not been configured and/or no simulations have been added.
+#[get("/run-sim")]
+async fn run_simulation(
+    app_sim: web::Data<Mutex<Option<MulStrategyBlackjackSimulator>>>,
+) -> Result<HttpResponse, UserError> {
+    // Attempt to lock the mutex
+    if let Ok(mut guard) = app_sim.lock() {
+        // Check if we have a valid simulator
+        if let Some(simulator) = guard.as_mut() {
+            if simulator.simulations().is_empty() {
+                return Err(UserError::BadInput(String::from(
+                    "no simulations have been added, unable to run.",
+                )));
+            }
+            match simulator.run_return_out(Box::new(write_simulation_summary_as_json)) {
+                Ok(res_as_json) => {
+                    return Ok(HttpResponse::Ok()
+                        .content_type(ContentType::json())
+                        .body(res_as_json));
+                }
+                Err(_e) => return Err(UserError::InternalError),
+            }
+        }
+    }
+
+    Err(UserError::InternalError)
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    Ok(())
+    let address = "127.0.0.1";
+    let port = 8080;
+    println!("Listenting at {}:{}...", address, port);
+
+    let app_sim: web::Data<Mutex<Option<MulStrategyBlackjackSimulator>>> =
+        web::Data::new(Mutex::new(None));
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(app_sim.clone())
+            .service(configure_simulation_parameters)
+            .service(add_simulation)
+            .service(run_simulation)
+    })
+    .bind((address, port))?
+    .run()
+    .await
 }
