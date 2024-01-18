@@ -1,4 +1,0 @@
-
--Add H17 playing deviations
--Add a way to create betting/counting strategies w/ macros
--Create API and a user interface so that game parameters can be tweaked on demand
