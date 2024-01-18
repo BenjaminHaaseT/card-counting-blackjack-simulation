@@ -21,4 +21,5 @@ Lets run a simple example, we will test all strategies via the executable in the
 the number of simulations run per strategy will be 500, the minimum bet will be `$5.00`, the maximum number of hands per strategy will be 1000, we allow surrender and the betting margin (i.e. the amount we increase our bet when the count is positive) will be 2.
 Phew... After running the above command we can open up `out.txt` to see the results of our simulations. Some example output is below. Note how the consistantly profitable strategies with the highest winnings per bet are typically Wong's halves, Zen Count or the Unbalanced Zen Count.
 
+![](simulation.png)
 
