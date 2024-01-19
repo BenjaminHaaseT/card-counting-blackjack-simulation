@@ -1,7 +1,7 @@
 # An Extensible Blackjack Card Counting Simulator
 ## Description
 A program that allows users to configure parameters for a blackjack card counting simulation to test strategies. The project is also a library, with the intent that
-others may implement the collection of traits that define a strategy to provide fine grain customization. Potentially allowing users to test new strategies easily.
+others may implement the collection of traits that define a strategy to provide fine grain customization. Potentially allowing users to test novel strategies quickly and easily.
 Most of the garden variety counting strategies have already been implemented, and the executable associated with the crate allows the users to test all the garden variety strategies with parameters passed in via the command line.
 
 ## Goals
