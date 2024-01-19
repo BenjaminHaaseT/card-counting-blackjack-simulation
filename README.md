@@ -6,7 +6,6 @@ Most of the garden variety counting strategies have already been implemented, an
 
 ## Goals
 In this project, I wanted to learn how to create interfaces in a library that would allow for customization by others, as well as how to leverage concurrency when running simulations. 
-Since a simulation for each strategy is independent of other strategy simulations, I wanted to learn how to harness concurrency to increase efficiency when running many different simulations.
 
 ## Usage
 To run the executable for this program clone the repository onto your local machine. Since this crate is part of a workspace make sure you are located in the blackjack_sim directory.
